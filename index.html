@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>PIXEL ARENA — LAN Shooter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800;900&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ROTATE HINT (portrait mobile) -->
+<div id="rotate-hint">ROTATE DEVICE ↻</div>
+
+<!-- CABINET -->
+<div id="app">
+
+  <!-- LEFT SIDE -->
+  <aside class="side left">
+    <div class="plate">Player 1</div>
+    <div class="speaker"><div class="ring"></div></div>
+    <div class="coin-slot">
+      <div class="lbl">Insert Coin</div>
+      <div class="val">25¢ / 1 CREDIT</div>
+    </div>
+    <div class="joystick-plate">
+      <div class="base"><div class="stick"></div><div class="ball"></div></div>
+      <div class="lbl">8-Way</div>
+    </div>
+    <div class="led-stack">
+      <div class="led-row"><span class="led on-green blink"></span> Power</div>
+      <div class="led-row"><span class="led on-amber"></span> Service</div>
+      <div class="led-row"><span class="led"></span> Tilt</div>
+    </div>
+    <div class="marquee">
+      <div class="title-mini">PIXEL <span class="ar">ARENA</span></div>
+      <div class="sub">&copy; 1996 NODE-7 GAMES</div>
+    </div>
+    <div class="screws-bottom"><div class="screw"></div><div class="screw"></div></div>
+  </aside>
+
+  <!-- CRT MONITOR -->
+  <main class="crt-bezel">
+    <div class="crt" id="crtScreen">
+      <div class="flicker"></div>
+
+      <!-- START -->
+      <section id="startScreen" class="screen">
+        <p class="crt-kicker">Cabinet Ready · Ver 2.00</p>
+        <h1 class="crt-title"><span>PIXEL</span> <span class="ar">ARENA</span></h1>
+        <p class="crt-sub">Up to 8 Players · LAN Only · Same WiFi</p>
+        <div class="insert-coin">▸ Press Start to Play ◂</div>
+        <div class="menu-stack">
+          <button class="menu-item" id="btnHost"><span class="arrow">▶</span> Host Game <span class="hotkey">[P1]</span></button>
+          <button class="menu-item" id="btnJoin"><span class="arrow">▶</span> Join Game <span class="hotkey">[P2]</span></button>
+        </div>
+        <div class="crt-footer">
+          <span><span class="kbd">WASD</span> Move &nbsp;·&nbsp; <span class="kbd">Mouse</span> Aim &nbsp;·&nbsp; <span class="kbd">Click</span> Shoot &nbsp;·&nbsp; <span class="kbd">Q</span> Ult</span>
+          <span class="credits">Credits · 01</span>
+        </div>
+      </section>
+
+      <!-- JOIN -->
+      <section id="joinScreen" class="screen hide">
+        <div class="crt-header">
+          <div>
+            <p class="crt-kicker">Network · Connect</p>
+            <h2 class="crt-h2">Join <span class="ar">Game</span></h2>
+          </div>
+          <span class="net-status"><span class="led on-amber blink"></span> Standby</span>
+        </div>
+        <div style="max-width:480px">
+          <div class="field-block">
+            <div class="label">Enter Room Code</div>
+            <input class="input" id="joinCode" maxlength="5" placeholder="XXXXX" autocomplete="off">
+          </div>
+          <div class="row">
+            <button class="crt-btn primary" id="btnDoJoin">Connect ▶</button>
+            <button class="crt-btn" id="btnJoinBack">◀ Back</button>
+          </div>
+          <div class="err-line" id="joinErr"></div>
+        </div>
+        <div class="crt-footer">
+          <span>Get the 5-character code from your host.</span>
+          <span class="credits">Credits · 01</span>
+        </div>
+      </section>
+
+      <!-- LOBBY -->
+      <section id="lobbyScreen" class="screen hide">
+        <div class="crt-header">
+          <div>
+            <p class="crt-kicker">Network · Lobby</p>
+            <h2 class="crt-h2">Ready <span class="ar">Room</span></h2>
+          </div>
+          <span class="net-status" id="netPill">
+            <span class="led" id="netLed"></span>
+            <span id="netLabel">Connecting…</span>
+          </span>
+        </div>
+
+        <div id="hostOnlyCode" class="code-row hide">
+          <div class="code-meta">
+            <div class="kicker">Share this code</div>
+            <div class="roomcode" id="roomCodeBig">-----</div>
+            <p class="hint">Match starts when everyone is Ready. Minimum 2 players.</p>
+          </div>
+        </div>
+
+        <div class="lobby-grid">
+          <div class="panel">
+            <div class="phead"><span>Your Unit</span><span class="dot"></span></div>
+            <div class="field-block">
+              <div class="label">Callsign</div>
+              <input class="input" id="myName" maxlength="14" placeholder="PLAYER">
+            </div>
+            <div class="field-block">
+              <div class="label">Select Fighter</div>
+              <div class="avatar-grid" id="avatarGrid"></div>
+              <div id="charDesc" class="small" style="margin-top:6px;min-height:32px"></div>
+            </div>
+            <div class="row" style="margin-top:auto">
+              <button class="crt-btn go" id="btnReady">I'm Ready</button>
+              <button class="crt-btn" id="btnLeave">Leave</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="phead"><span>Roster · Active</span><span class="dot"></span></div>
+            <div class="players" id="playerList"></div>
+            <div id="hostStartWrap" style="margin-top:12px;display:none">
+              <button class="crt-btn primary" id="btnStart" disabled style="width:100%;padding:14px">▶ Start Match</button>
+              <p class="hint-line" id="startHint">Need ≥2 duelists, all Ready.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- .crt -->
+  </main>
+
+  <!-- RIGHT SIDE -->
+  <aside class="side right">
+    <div class="plate" style="text-align:right">Player 2</div>
+    <div class="speaker"><div class="ring"></div></div>
+    <div class="coin-slot">
+      <div class="lbl" style="text-align:right">Insert Coin</div>
+      <div class="val" style="text-align:right">25¢ / 1 CREDIT</div>
+    </div>
+    <div class="joystick-plate">
+      <div class="base"><div class="stick"></div><div class="ball" style="background:radial-gradient(circle at 35% 30%, #6bc4f0, #2d7fb8 60%, #0a2a44 100%)"></div></div>
+      <div class="lbl">8-Way</div>
+    </div>
+    <div class="led-stack">
+      <div class="led-row"><span class="led on-blue"></span> Link</div>
+      <div class="led-row"><span class="led on-red blink"></span> Record</div>
+      <div class="led-row"><span class="led"></span> Spare</div>
+    </div>
+    <div class="marquee">
+      <div class="title-mini">Cabinet <span class="ar">#07</span></div>
+      <div class="sub">MFG · NODE-7</div>
+    </div>
+    <div class="screws-bottom"><div class="screw"></div><div class="screw"></div></div>
+  </aside>
+
+  <!-- CONTROL PANEL -->
+  <div class="control-panel">
+    <div class="plate" style="flex-shrink:0">P1 Controls</div>
+    <div class="row" style="gap:18px;margin-left:12px">
+      <button class="arc-btn red"  data-panel-action="host"><span class="cap"></span><span class="lbl">Start</span></button>
+      <button class="arc-btn blue" data-panel-action="join"><span class="cap"></span><span class="lbl">Select</span></button>
+      <button class="arc-btn go"   data-panel-action="ready"><span class="cap"></span><span class="lbl">Ready</span></button>
+      <button class="arc-btn gray" data-panel-action="back"><span class="cap"></span><span class="lbl">Back</span></button>
+    </div>
+    <div style="margin-left:auto;display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+      <div class="plate">High Score · 999,900</div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- GAME -->
+<div id="gameWrap" class="hide">
+  <canvas id="game" width="1280" height="720"></canvas>
+
+  <!-- CRT overlay during game -->
+  <div id="crtGameOverlay"></div>
+
+  <div id="hud" class="hide">
+    <div class="hud-panel">
+      <span class="sub">Fighter</span>
+      <div id="myStatus">HP 100 · KILLS 0</div>
+      <div style="margin-top:6px">
+        <div style="height:4px;background:#1a1815;border-radius:2px;overflow:hidden">
+          <div id="ultBar" style="height:100%;width:0%;background:#4a2a80;transition:width .1s"></div>
+        </div>
+        <div id="ultLabel" style="font-size:9px;letter-spacing:.18em;margin-top:2px;color:#9a9079"></div>
+      </div>
+    </div>
+    <div class="hud-panel" id="timer">3:00</div>
+    <div class="hud-panel">
+      <span class="sub">Leaderboard</span>
+      <div class="scores" id="scoreBoard"></div>
+    </div>
+  </div>
+
+  <div id="powerupPanel" class="hide">
+    <div class="pup-title">POWER-UPS</div>
+    <div id="powerupLegend"></div>
+  </div>
+
+  <div id="endScreen">
+    <div class="end-card">
+      <h2 class="winner" id="winnerLine">Match Over</h2>
+      <div class="rank-list" id="rankList"></div>
+      <div class="row" style="justify-content:center">
+        <button class="crt-btn primary" id="btnBackLobby">Back to Lobby</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile overlay -->
+  <div id="mobileOverlay" class="hide">
+    <div id="joystickLeft"><div id="joystickLeftKnob"></div></div>
+    <div id="joystickRight">
+      <div id="joystickRightKnob"></div>
+      <div id="ultBtn">ULT</div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+<script>
+// Request fullscreen on first user interaction (mobile browsers require gesture)
+(function () {
+  var _done = false;
+  function _tryFullscreen() {
+    if (_done) return;
+    _done = true;
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if (req) req.call(el).catch(function () {});
+    // Lock to landscape if supported
+    var sc = window.screen;
+    if (sc && sc.orientation && sc.orientation.lock) {
+      sc.orientation.lock('landscape').catch(function () {});
+    }
+  }
+  ['touchstart', 'click', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, _tryFullscreen, { once: true, passive: true });
+  });
+})();
+</script>
+</body>
+</html>
