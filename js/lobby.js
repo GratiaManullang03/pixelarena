@@ -42,7 +42,14 @@ export function renderAvatars() {
         b.onclick = () => {
             State.myCharIdx = i;
             State.myAvatar = ch.icon;
+            const me = State.players[State.myId];
+            if (me) {
+                me.charIdx = i;
+                me.color = ch.color;
+                me.avatar = ch.icon;
+            }
             renderAvatars();
+            renderPlayerList();
             broadcastMe();
         };
         ui.avatarGrid.appendChild(b);

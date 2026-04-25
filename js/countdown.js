@@ -11,7 +11,7 @@ function getOverlay() {
             _overlay.id = 'countdownOverlay';
             _overlay.style.cssText = `
         position:fixed;inset:0;display:none;align-items:center;justify-content:center;
-        z-index:15;pointer-events:none;
+        z-index:30;pointer-events:none;
       `;
             document.body.appendChild(_overlay);
         }
