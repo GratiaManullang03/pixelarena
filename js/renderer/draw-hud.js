@@ -31,11 +31,28 @@ export function updateHUD(ui, now, powerups) {
             parts.push(
                 `${me.powerup.toUpperCase()} ${Math.ceil((me.powerupUntil - now) / 1000)}s`,
             );
-        if (!me.alive)
+        if (!me.alive && !me.isSpectator)
             parts.push(
                 `RESPAWN ${Math.max(0, Math.ceil((me.respawnAt - now) / 1000))}s`,
             );
+        if (me.isSpectator) parts.push('SPECTATING');
         ui.myStatus.textContent = parts.join(' · ');
+
+        // Lives display (survival mode)
+        const livesEl = document.getElementById('livesDisplay');
+        if (livesEl) {
+            if (State.gameMode === 'survival') {
+                const total = 3;
+                const left = me.livesLeft ?? 3;
+                let s = '';
+                for (let i = 0; i < total; i++)
+                    s += i < left ? '♥' : '💀';
+                livesEl.textContent = s;
+                livesEl.style.display = 'block';
+            } else {
+                livesEl.style.display = 'none';
+            }
+        }
 
         const ultEl = document.getElementById('ultBar');
         if (ultEl) {

@@ -30,6 +30,26 @@ export function getCurrentMapName() {
     return MAPS[currentMapIndex] ? MAPS[currentMapIndex].name : '';
 }
 
+function _killPlayer(victim, killer, now) {
+    if (State.gameMode === 'survival') {
+        victim.livesLeft = Math.max(0, (victim.livesLeft ?? 3) - 1);
+        if (victim.livesLeft <= 0) {
+            victim.isSpectator = true;
+            victim.alive = false;
+            victim.respawnAt = Infinity;
+            Net.send('spectator', { id: victim.id });
+        } else {
+            victim.alive = false;
+            victim.respawnAt = now + 3000;
+        }
+    } else {
+        victim.alive = false;
+        victim.respawnAt = now + 3000;
+    }
+    if (killer) pushKillFeed(onKill(killer, victim, now));
+    Audio.boom();
+}
+
 export function pushKillFeed(data) {
     killFeed.unshift({ ...data, ts: performance.now() });
     if (killFeed.length > 5) killFeed.length = 5;
@@ -98,6 +118,8 @@ export function reset(seed) {
             lastUlt: 0,
             _lastFire: 0,
             _pyroLastPassive: 0,
+            livesLeft: 3,
+            isSpectator: false,
         });
     });
 
@@ -106,9 +128,12 @@ export function reset(seed) {
 }
 
 export function hostTick(dt, now, endMatchCallback) {
-    if (Object.keys(State.players).length === 1 && State.running) {
-        endMatchCallback();
-        return;
+    const ps = Object.values(State.players);
+    if (State.gameMode === 'survival') {
+        const alive = ps.filter((p) => !p.isSpectator);
+        if (alive.length <= 1 && ps.length > 1) { endMatchCallback(); return; }
+    } else {
+        if (ps.length === 1 && State.running) { endMatchCallback(); return; }
     }
 
     // Mana regen
@@ -145,6 +170,7 @@ function _processPlayer(p, dt, now) {
     p.aim = ip.aim;
 
     if (!p.alive) {
+        if (p.isSpectator) return;
         if (now >= p.respawnAt) {
             const ch = CHARACTERS[p.charIdx] || CHARACTERS[0];
             const s = findSpawn();
@@ -221,10 +247,7 @@ function _reaperDrain(p, dt, now) {
         enemy.hp -= drain;
         p.hp = Math.min(p.maxHp, p.hp + drain * 0.5);
         if (enemy.hp > 0) return;
-        enemy.alive = false;
-        enemy.respawnAt = now + 3000;
-        pushKillFeed(onKill(p, enemy, now));
-        Audio.boom();
+        _killPlayer(enemy, p, now);
     });
 }
 
@@ -346,10 +369,7 @@ function _meleeSweep(p, ch, now) {
         spawnHit(enemy.x, enemy.y, dmg, enemy.color);
         shake(5);
         if (enemy.hp > 0) return;
-        enemy.alive = false;
-        enemy.respawnAt = now + 3000;
-        pushKillFeed(onKill(p, enemy, now));
-        Audio.boom();
+        _killPlayer(enemy, p, now);
     });
     Net.send('shot', { x: p.x, y: p.y, color: p.color });
     if (p.id === State.myId) Audio.shoot();
@@ -430,11 +450,8 @@ function _bulletHitPlayers(b, now) {
         spawnHit(p.x, p.y, dmg, p.color);
         shake(5);
         if (p.hp <= 0) {
-            p.alive = false;
-            p.respawnAt = now + 3000;
             const killer = State.players[b.owner];
-            if (killer) pushKillFeed(onKill(killer, p, now));
-            Audio.boom();
+            _killPlayer(p, killer, now);
         }
         if (b.pierceLeft !== undefined) {
             b.pierceLeft--;

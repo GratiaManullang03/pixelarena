@@ -102,6 +102,18 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
     ui = uiRefs;
     initLobbyNet(ui, renderAvatars, renderPlayerList, setNet);
 
+    // Mode picker (host only)
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (!State.isHost) return;
+            State.gameMode = btn.dataset.mode;
+            document.querySelectorAll('.mode-btn').forEach((b) =>
+                b.classList.toggle('active', b.dataset.mode === State.gameMode),
+            );
+            _updateModeBadge();
+        });
+    });
+
     ui.btnHost.onclick = () => {
         State.isHost = true;
         State.room = makeRoomCode();
@@ -163,10 +175,11 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
         const ps = Object.values(State.players);
         if (ps.length < 2 || !ps.every((p) => p.ready)) return;
         const seed = Math.floor(Math.random() * 1e9);
-        Net.send('start', { seed });
-        startMatchFn(seed);
+        Net.send('start', { seed, mode: State.gameMode });
+        startMatchFn(seed, State.gameMode);
     };
 
+    _updateModeBadge();
     ui.btnBackLobby.onclick = () => {
         ui.end.style.display = 'none';
         Object.values(State.players).forEach((p) => {
@@ -183,4 +196,18 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
     };
 
     window._pendingStart = startMatchFn;
+}
+
+function _updateModeBadge() {
+    const badgeRow = document.getElementById('modeBadgeRow');
+    const badge = document.getElementById('modeBadge');
+    if (!badgeRow || !badge) return;
+    badgeRow.classList.remove('hide');
+    if (State.gameMode === 'survival') {
+        badge.textContent = '♥ SURVIVAL — 3 LIVES';
+        badge.className = 'mode-badge survival';
+    } else {
+        badge.textContent = '⚔ CLASSIC — RESPAWN';
+        badge.className = 'mode-badge';
+    }
 }

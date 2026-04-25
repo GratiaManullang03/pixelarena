@@ -26,9 +26,12 @@ export function draw(
     killFeed,
 ) {
     const me = playerMap[State.myId];
-    if (me) {
-        cam.x += (me.x - cam.x) * 0.12;
-        cam.y += (me.y - cam.y) * 0.12;
+    const camTarget = (me?.isSpectator && State.spectating)
+        ? playerMap[State.spectating]
+        : me;
+    if (camTarget) {
+        cam.x += (camTarget.x - cam.x) * 0.12;
+        cam.y += (camTarget.y - cam.y) * 0.12;
     }
 
     const localShake = shakeMag; // read before tick

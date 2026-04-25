@@ -701,8 +701,9 @@ input {
     justify-content: space-between;
     align-items: flex-end;
     border-bottom: 2px solid rgba(239, 230, 209, 0.18);
-    padding-bottom: 14px;
-    margin-bottom: 20px;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
 }
 .crt-h2 {
     font-family: 'Barlow Condensed', sans-serif;
@@ -794,18 +795,20 @@ input {
 .lobby-grid {
     display: grid;
     grid-template-columns: 1fr 1.1fr;
-    gap: 24px;
+    gap: 16px;
     flex: 1;
     min-height: 0;
+    overflow: hidden;
 }
 .panel {
     background: rgba(10, 18, 14, 0.55);
     border: 1px solid rgba(239, 230, 209, 0.15);
     border-radius: 3px;
-    padding: 16px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
 }
 .panel .phead {
     display: flex;
@@ -982,6 +985,164 @@ input {
     margin-top: 10px;
     font-size: 12px;
     color: var(--screen-dim);
+}
+
+/* ===== MODE PICKER (host only) ===== */
+.mode-picker {
+    margin-top: 14px;
+}
+.mode-picker > .label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    color: var(--label);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.mode-picker > .label::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--amber-glow);
+    display: inline-block;
+}
+.mode-btns {
+    display: flex;
+    gap: 8px;
+}
+.mode-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 8px;
+    background: #07100c;
+    border: 1px solid #1a2418;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+.mode-btn:hover {
+    border-color: var(--amber);
+}
+.mode-btn.active {
+    background: #1a1410;
+    border-color: var(--amber-glow);
+    box-shadow: inset 0 0 10px rgba(255,192,74,0.15);
+}
+.mode-btn .mode-icon {
+    font-size: 18px;
+    line-height: 1;
+    color: var(--screen-dim);
+}
+.mode-btn.active .mode-icon {
+    color: var(--amber-glow);
+}
+.mode-btn .mode-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--screen-ink);
+}
+.mode-btn .mode-desc {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--screen-dim);
+}
+
+/* Mode badge (visible to all players in lobby) */
+.mode-badge-row {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.mode-badge-row.hide { display: none !important; }
+.mode-badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 2px;
+    background: #1a1410;
+    border: 1px solid var(--amber-glow);
+    color: var(--amber-glow);
+    box-shadow: 0 0 8px rgba(255,192,74,0.2);
+}
+.mode-badge.survival {
+    border-color: var(--red-glow);
+    color: var(--red-glow);
+    background: #1a0808;
+    box-shadow: 0 0 8px rgba(232,85,64,0.2);
+}
+
+/* Spectate overlay */
+#spectateOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 28;
+    pointer-events: none;
+    display: none;
+}
+#spectateOverlay.active { display: block; }
+#spectateBar {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,9,8,0.88);
+    border: 1px solid #6a6863;
+    padding: 10px 20px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.2em;
+    color: var(--screen-ink);
+    text-transform: uppercase;
+    text-align: center;
+    border-radius: 3px;
+    pointer-events: all;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+#spectateBar button {
+    background: #2a2724;
+    border: 1px solid #6a6863;
+    color: var(--screen-ink);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    padding: 2px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+#spectateBar button:hover { background: #3a3632; }
+#spectateLives {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 36px;
+    letter-spacing: 6px;
+    pointer-events: none;
+}
+
+/* Lives display in HUD */
+#livesDisplay {
+    font-size: 18px;
+    letter-spacing: 4px;
+    margin-top: 4px;
 }
 .err-line {
     color: var(--red-glow);
@@ -1655,18 +1816,19 @@ body::after {
 /* Short landscape screens (phones in landscape) */
 @media (max-height: 520px) and (orientation: landscape) {
     #app {
-        grid-template-rows: 1fr 80px;
+        grid-template-rows: 1fr 72px;
         padding: 4px;
     }
     .crt-bezel {
         margin-bottom: 4px;
+        padding: 12px;
     }
     .control-panel {
-        padding: 6px 12px;
+        padding: 4px 12px;
     }
     .arc-btn .cap {
-        width: 40px;
-        height: 40px;
+        width: 38px;
+        height: 38px;
     }
     .arc-btn .lbl {
         display: none;
@@ -1684,20 +1846,91 @@ body::after {
         gap: 4px;
     }
     .crt {
-        padding: 10px 14px;
+        padding: 8px 12px;
     }
+    /* Start screen compact */
     .crt-title {
         font-size: clamp(32px, 5vw, 60px);
     }
     .insert-coin {
-        margin-top: 8px;
-        font-size: 16px;
+        margin-top: 6px;
+        font-size: 15px;
     }
     .menu-stack {
-        margin-top: 12px;
-        gap: 8px;
+        margin-top: 8px;
+        gap: 6px;
     }
     .menu-item {
-        font-size: 22px;
+        font-size: 20px;
+        padding: 2px 0;
+    }
+    /* Lobby compact */
+    .crt-header {
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+    }
+    .crt-h2 {
+        font-size: 28px;
+    }
+    .crt-kicker {
+        font-size: 10px;
+    }
+    .lobby-grid {
+        gap: 8px;
+    }
+    .panel {
+        padding: 8px;
+    }
+    .panel .phead {
+        font-size: 11px;
+        margin-bottom: 6px;
+    }
+    .field-block {
+        margin-bottom: 8px;
+    }
+    .field-block > .label {
+        font-size: 10px;
+        margin-bottom: 3px;
+    }
+    .input {
+        font-size: 16px;
+        padding: 6px 8px;
+    }
+    .avatar-grid {
+        gap: 4px;
+    }
+    .avatar-btn {
+        font-size: 18px;
+    }
+    #charDesc {
+        display: none;
+    }
+    .code-row {
+        margin-bottom: 8px;
+    }
+    .roomcode {
+        font-size: 32px;
+        padding: 8px 12px;
+    }
+    .hint {
+        display: none;
+    }
+    .hint-line {
+        font-size: 10px;
+        margin-top: 4px;
+    }
+    .crt-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    .player {
+        padding: 4px 8px;
+    }
+    .player .name {
+        font-size: 13px;
+    }
+    .net-status {
+        font-size: 9px;
+        padding: 4px 8px;
     }
 }

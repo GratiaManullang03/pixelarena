@@ -15,6 +15,9 @@ const server = http.createServer((req, res) => {
         '.html': 'text/html',
         '.css': 'text/css',
         '.js': 'application/javascript',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.ico': 'image/x-icon',
     };
 
     fs.readFile(filePath, (err, data) => {

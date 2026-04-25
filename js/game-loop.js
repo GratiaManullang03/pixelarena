@@ -34,13 +34,27 @@ function escape(s) {
     );
 }
 
-export function startMatch(seed) {
+export function startMatch(seed, mode) {
     _show('game');
     _ui.end.style.display = 'none';
+    State.gameMode = mode || 'classic';
+    State.spectating = null;
+    const spectateEl = document.getElementById('spectateOverlay');
+    if (spectateEl) spectateEl.classList.remove('active');
     clearFx();
     reset(seed);
+    // Survival: add livesLeft to each player
+    if (State.gameMode === 'survival') {
+        Object.values(State.players).forEach((p) => {
+            p.livesLeft = 3;
+            p.isSpectator = false;
+        });
+        State.matchEnd = State.matchStart + 30 * 60 * 1000; // no timer limit
+    }
     State.matchStart = performance.now();
-    State.matchEnd = State.matchStart + 3 * 60 * 1000;
+    State.matchEnd = State.gameMode === 'survival'
+        ? State.matchStart + 30 * 60 * 1000
+        : State.matchStart + 3 * 60 * 1000;
     State.running = false;
     startCountdown(() => {
         State.running = true;
@@ -76,7 +90,42 @@ function buildRanks() {
         .sort((a, b) => b.kills - a.kills);
 }
 
+function _initSpectateControls() {
+    function _nextSpectateTarget(dir) {
+        const alive = Object.values(State.players).filter(
+            (p) => !p.isSpectator && p.id !== State.myId,
+        );
+        if (!alive.length) return;
+        const idx = alive.findIndex((p) => p.id === State.spectating);
+        const next = alive[(idx + dir + alive.length) % alive.length];
+        State.spectating = next.id;
+        const nameEl = document.getElementById('spectateName');
+        if (nameEl) nameEl.textContent = next.name || next.id.slice(0, 6);
+    }
+    document.getElementById('spectatePrev')?.addEventListener('click', () => _nextSpectateTarget(-1));
+    document.getElementById('spectateNext')?.addEventListener('click', () => _nextSpectateTarget(1));
+}
+
+function _activateSpectate(playerId) {
+    const me = State.players[playerId];
+    if (!me) return;
+    me.isSpectator = true;
+    me.alive = false;
+    if (playerId !== State.myId) return;
+    const el = document.getElementById('spectateOverlay');
+    if (el) el.classList.add('active');
+    const alive = Object.values(State.players).filter(
+        (p) => !p.isSpectator && p.id !== State.myId,
+    );
+    if (alive.length) {
+        State.spectating = alive[0].id;
+        const nameEl = document.getElementById('spectateName');
+        if (nameEl) nameEl.textContent = alive[0].name || alive[0].id.slice(0, 6);
+    }
+}
+
 export function setupNetGameHandlers() {
+    _initSpectateControls();
     Net.on((msg) => {
         switch (msg.type) {
             case 'input':
@@ -106,6 +155,9 @@ export function setupNetGameHandlers() {
             case 'killfeed':
                 pushKillFeed(msg.payload);
                 break;
+            case 'spectator':
+                _activateSpectate(msg.payload.id);
+                break;
             case 'end':
                 endMatch(msg.payload.ranks);
                 break;
@@ -124,7 +176,8 @@ export function startGameLoop(ctx) {
 
         if (State.isHost) {
             const me = State.players[State.myId];
-            if (me) me.inputBuf = snapshotInput(me, cam, _W, _H);
+            if (me && !me.isSpectator) me.inputBuf = snapshotInput(me, cam, _W, _H);
+            if (me?.isSpectator && !State.spectating) _activateSpectate(State.myId);
             hostTick(dt, now, () => {
                 const ranks = buildRanks();
                 Net.send('end', { ranks });

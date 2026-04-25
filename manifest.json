@@ -1,0 +1,10 @@
+{
+  "name": "PIXEL ARENA",
+  "short_name": "PixelArena",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0908",
+  "theme_color": "#0a0908",
+  "start_url": "/",
+  "icons": []
+}

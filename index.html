@@ -6,6 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
   <title>PIXEL ARENA — LAN Shooter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -110,6 +111,25 @@
             <div class="roomcode" id="roomCodeBig">-----</div>
             <p class="hint">Match starts when everyone is Ready. Minimum 2 players.</p>
           </div>
+          <div id="modePicker" class="mode-picker">
+            <div class="label">Game Mode</div>
+            <div class="mode-btns">
+              <button class="mode-btn active" data-mode="classic">
+                <span class="mode-icon">⚔</span>
+                <span class="mode-name">Classic</span>
+                <span class="mode-desc">Respawn · 3 min</span>
+              </button>
+              <button class="mode-btn" data-mode="survival">
+                <span class="mode-icon">♥♥♥</span>
+                <span class="mode-name">Survival</span>
+                <span class="mode-desc">3 lives · Last man</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-badge-row hide" id="modeBadgeRow">
+          <span class="mode-badge" id="modeBadge">⚔ CLASSIC</span>
         </div>
 
         <div class="lobby-grid">
@@ -195,6 +215,7 @@
     <div class="hud-panel">
       <span class="sub">Fighter</span>
       <div id="myStatus">HP 100 · KILLS 0</div>
+      <div id="livesDisplay"></div>
       <div style="margin-top:6px">
         <div style="height:4px;background:#1a1815;border-radius:2px;overflow:hidden">
           <div id="ultBar" style="height:100%;width:0%;background:#4a2a80;transition:width .1s"></div>
@@ -224,6 +245,16 @@
     </div>
   </div>
 
+  <!-- Spectate overlay (survival mode) -->
+  <div id="spectateOverlay">
+    <div id="spectateLives"></div>
+    <div id="spectateBar">
+      <button id="spectatePrev">◀</button>
+      <span>SPECTATING: <span id="spectateName">—</span></span>
+      <button id="spectateNext">▶</button>
+    </div>
+  </div>
+
   <!-- Mobile overlay -->
   <div id="mobileOverlay" class="hide">
     <div id="joystickLeft"><div id="joystickLeftKnob"></div></div>
@@ -236,23 +267,44 @@
 
 <script type="module" src="js/main.js"></script>
 <script>
-// Request fullscreen on first user interaction (mobile browsers require gesture)
 (function () {
-  var _done = false;
   function _tryFullscreen() {
-    if (_done) return;
-    _done = true;
     var el = document.documentElement;
     var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-    if (req) req.call(el).catch(function () {});
-    // Lock to landscape if supported
-    var sc = window.screen;
-    if (sc && sc.orientation && sc.orientation.lock) {
-      sc.orientation.lock('landscape').catch(function () {});
+    if (req) {
+      req.call(el).then(function () {
+        var sc = window.screen;
+        if (sc && sc.orientation && sc.orientation.lock) {
+          sc.orientation.lock('landscape').catch(function () {});
+        }
+        var btn = document.getElementById('fsBtn');
+        if (btn) btn.style.display = 'none';
+      }).catch(function () {});
     }
   }
-  ['touchstart', 'click', 'keydown'].forEach(function (ev) {
-    document.addEventListener(ev, _tryFullscreen, { once: true, passive: true });
+
+  // Show a tap-to-fullscreen button on mobile (address bar will hide on tap)
+  var isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    var btn = document.createElement('button');
+    btn.id = 'fsBtn';
+    btn.textContent = '⛶ TAP FOR FULLSCREEN';
+    btn.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;' +
+      'background:#d89b2a;color:#0a0908;border:0;padding:10px;' +
+      'font-family:"Barlow Condensed",sans-serif;font-weight:900;font-size:15px;' +
+      'letter-spacing:.18em;cursor:pointer;text-align:center;';
+    btn.addEventListener('click', function () { _tryFullscreen(); }, { passive: true });
+    document.addEventListener('DOMContentLoaded', function () {
+      document.body.appendChild(btn);
+    });
+  }
+
+  // Also try on any touch/click (works if already in a gesture context)
+  ['touchstart', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, function _once() {
+      _tryFullscreen();
+      document.removeEventListener(ev, _once);
+    }, { passive: true });
   });
 })();
 </script>

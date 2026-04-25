@@ -216,8 +216,10 @@ function onNetMsg(msg, show) {
         }
 
         case 'start':
-            if (State.screen === 'lobby' && msg.payload?.seed !== undefined)
-                window._pendingStart(msg.payload.seed);
+            if (State.screen === 'lobby' && msg.payload?.seed !== undefined) {
+                if (msg.payload.mode) State.gameMode = msg.payload.mode;
+                window._pendingStart(msg.payload.seed, msg.payload.mode || 'classic');
+            }
             break;
     }
 }

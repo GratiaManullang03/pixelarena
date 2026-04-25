@@ -11,4 +11,6 @@ export const State = {
     matchStart: 0,
     matchEnd: 0,
     running: false,
+    gameMode: 'classic',   // 'classic' | 'survival'
+    spectating: null,      // id of player being spectated (survival mode)
 };
