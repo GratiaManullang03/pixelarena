@@ -1058,6 +1058,18 @@ input {
     color: var(--screen-dim);
 }
 
+/* Lobby action bar — always visible at bottom of lobby screen */
+.lobby-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+    margin-top: 10px;
+}
+.lobby-actions .crt-btn {
+    flex: 1;
+    text-align: center;
+}
+
 /* Mode badge (visible to all players in lobby) */
 .mode-badge-row {
     margin-bottom: 10px;
