@@ -146,7 +146,7 @@ export function hostTick(dt, now, endMatchCallback) {
     _tickFirePads(dt, now);
     _tickPickups(now);
 
-    if (!hostTick._lastSnap || now - hostTick._lastSnap > 60) {
+    if (!hostTick._lastSnap || now - hostTick._lastSnap > 33) {
         hostTick._lastSnap = now;
         Net.send(
             'snapshot',

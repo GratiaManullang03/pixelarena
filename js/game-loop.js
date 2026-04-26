@@ -8,7 +8,7 @@ import {
     reset, hostTick, bullets, powerups, hpItems, firePads, turrets,
     killFeed, pushKillFeed,
 } from './engine/game-engine.js';
-import { applySnap, getInterpolated } from './engine/snapshot.js';
+import { applySnap, getInterpolated, getInterpDelay } from './engine/snapshot.js';
 import { snapshotInput } from './engine/physics.js';
 import { spawnMuzzle, spawnHit, spawnPickupFx, shake, tickParticles, clearFx } from './engine/particles.js';
 import { draw, cam } from './renderer/renderer.js';
@@ -186,7 +186,7 @@ export function startGameLoop(ctx) {
             tickParticles(dt);
             draw(ctx, _W, _H, now, State.players, bullets, powerups, hpItems, firePads, turrets, killFeed);
         } else {
-            if (!loop._lastInput || now - loop._lastInput > 50) {
+            if (!loop._lastInput || now - loop._lastInput > 33) {
                 loop._lastInput = now;
                 const me = State.players[State.myId];
                 const inp = snapshotInput(me, cam, _W, _H);
@@ -194,7 +194,7 @@ export function startGameLoop(ctx) {
             }
             bullets.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
             tickParticles(dt);
-            const playerMap = getInterpolated(now - 100) || State.players;
+            const playerMap = getInterpolated(now - getInterpDelay()) || State.players;
             draw(ctx, _W, _H, now, playerMap, bullets, powerups, hpItems, firePads, turrets, killFeed);
         }
 

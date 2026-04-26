@@ -2,8 +2,10 @@
 import { State } from '../state.js';
 import { walls, setWalls } from './physics.js';
 
-// Ring buffer: [older, newer]
-const snapBuffer = [null, null];
+// Ring buffer: 4 frames for smoother interpolation under packet loss
+const SNAP_BUF = 4;
+const snapBuffer = [];
+let _interpDelay = 80; // adaptive interpolation delay in ms
 
 function clamp01(v) {
     return v < 0 ? 0 : v > 1 ? 1 : v;
@@ -17,29 +19,48 @@ function lerpAngle(a, b, t) {
 }
 
 export function pushSnapshot(snap, receivedAt) {
-    snapBuffer[0] = snapBuffer[1];
-    snapBuffer[1] = { ...snap, receivedAt };
+    snapBuffer.push({ ...snap, receivedAt });
+    if (snapBuffer.length > SNAP_BUF) snapBuffer.shift();
+
+    // Adapt delay: aim for 1.5x the rolling avg inter-snapshot interval
+    if (snapBuffer.length >= 2) {
+        const intervals = [];
+        for (let i = 1; i < snapBuffer.length; i++)
+            intervals.push(snapBuffer[i].receivedAt - snapBuffer[i - 1].receivedAt);
+        const avg = intervals.reduce((s, v) => s + v, 0) / intervals.length;
+        // clamp between 40ms and 150ms
+        _interpDelay = Math.max(40, Math.min(150, avg * 1.5));
+    }
 }
 
+export function getInterpDelay() { return _interpDelay; }
+
 export function getInterpolated(renderTime) {
-    const prev = snapBuffer[0];
-    const next = snapBuffer[1];
-    if (!next) return null;
-    if (!prev) return next;
+    if (snapBuffer.length === 0) return null;
+
+    // Find the two snapshots straddling renderTime
+    let prev = null, next = null;
+    for (let i = snapBuffer.length - 1; i >= 0; i--) {
+        const s = snapBuffer[i];
+        if (s.receivedAt <= renderTime) { prev = s; break; }
+        next = s;
+    }
+
+    // If renderTime is before all buffered snaps, use oldest
+    if (!prev) return _buildMap(snapBuffer[0].players, null, 0);
+    // If renderTime is after all, use newest
+    if (!next) return _buildMap(prev.players, null, 1);
 
     const span = next.receivedAt - prev.receivedAt;
     const alpha = span > 0 ? clamp01((renderTime - prev.receivedAt) / span) : 1;
+    return _buildMap(next.players, prev.players, alpha);
+}
 
-    // Build interpolated player map keyed by id
+function _buildMap(nextPlayers, prevPlayers, alpha) {
     const result = {};
-    for (const sp of next.players) {
-        const pp = prev.players
-            ? prev.players.find((p) => p.id === sp.id)
-            : null;
-        if (!pp) {
-            result[sp.id] = sp;
-            continue;
-        }
+    for (const sp of nextPlayers) {
+        const pp = prevPlayers ? prevPlayers.find((p) => p.id === sp.id) : null;
+        if (!pp) { result[sp.id] = sp; continue; }
         result[sp.id] = {
             ...sp,
             x: pp.x + (sp.x - pp.x) * alpha,

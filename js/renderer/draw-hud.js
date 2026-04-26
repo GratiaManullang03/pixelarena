@@ -125,8 +125,9 @@ export function drawMiniMap(ctx, W, H, now, walls, hpItems, powerups) {
     const MM_W = 160,
         MM_H = 107,
         MM_PAD = 10;
-    const MM_X = W - MM_W - MM_PAD,
-        MM_Y = H - MM_H - MM_PAD;
+    // Top-left: avoids joystick overlap on mobile
+    const MM_X = MM_PAD,
+        MM_Y = 40;
     const scaleX = MM_W / ARENA.w,
         scaleY = MM_H / ARENA.h;
 
