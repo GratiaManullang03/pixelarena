@@ -2,7 +2,6 @@
 export const State = {
     screen: 'start',
     room: null,
-    isHost: false,
     myId: null,
     myName: '',
     myAvatar: '◉',

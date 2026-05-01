@@ -54,7 +54,7 @@
       <section id="startScreen" class="screen">
         <p class="crt-kicker">Cabinet Ready · Ver 2.00</p>
         <h1 class="crt-title"><span>PIXEL</span> <span class="ar">ARENA</span></h1>
-        <p class="crt-sub">Up to 8 Players · LAN Only · Same WiFi</p>
+        <p class="crt-sub">Up to 8 Players · Online &amp; LAN</p>
         <div class="insert-coin">▸ Press Start to Play ◂</div>
         <div class="menu-stack">
           <button class="menu-item" id="btnHost"><span class="arrow">▶</span> Host Game <span class="hotkey">[P1]</span></button>
@@ -75,7 +75,7 @@
           </div>
           <span class="net-status"><span class="led on-amber blink"></span> Standby</span>
         </div>
-        <div style="max-width:480px">
+        <div class="join-form">
           <div class="field-block">
             <div class="label">Enter Room Code</div>
             <input class="input" id="joinCode" maxlength="5" placeholder="XXXXX" autocomplete="off">
@@ -108,7 +108,10 @@
         <div id="hostOnlyCode" class="code-row hide">
           <div class="code-meta">
             <div class="kicker">Share this code</div>
-            <div class="roomcode" id="roomCodeBig">-----</div>
+            <div class="roomcode-row">
+              <div class="roomcode" id="roomCodeBig">-----</div>
+              <button class="crt-btn copy-btn" id="btnCopyCode" title="Copy room code">&#x2398; Copy</button>
+            </div>
             <p class="hint">Match starts when everyone is Ready. Minimum 2 players.</p>
           </div>
           <div id="modePicker" class="mode-picker">

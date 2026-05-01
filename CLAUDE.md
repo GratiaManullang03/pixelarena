@@ -22,46 +22,61 @@ No test suite is configured (`npm test` is a placeholder).
 
 ## Architecture
 
-PixelArena is a LAN-only multiplayer top-down shooter. It has three files of substance:
+PixelArena is a LAN-only multiplayer top-down shooter. The backend is a pure relay server; all game logic runs in the host's browser.
 
-- **`server.js`** — Node.js HTTP + WebSocket server. Pure relay: broadcasts each message to all other clients in the same room. No game logic lives here. Rooms are ephemeral `Map<roomCode, Set<WebSocket>>`.
-- **`game.js`** — All game logic, UI, and rendering in a single browser-side file (~1400+ LOC). Structured as IIFE modules assigned to constants.
-- **`index.html`** — Static shell with screen divs; `game.js` drives all transitions.
+**Entry points:**
+- **`server.js`** — Node.js HTTP + WebSocket relay. Broadcasts each message to all other clients in the same room. No game logic. Rooms are ephemeral `Map<roomCode, Set<WebSocket>>`.
+- **`index.html`** — Static shell with screen divs. Loads `js/main.js` as an ES module.
+- **`js/main.js`** — Bootstrap: creates canvas/context, caches DOM refs into `ui`, defines `show(screen)`, then calls init functions from other modules.
 - **`style.css`** — Dark pixel aesthetic using CSS custom properties (`--bg`, `--accent`, etc.).
 
-### game.js module structure
+### js/ module map
 
-| Module | Role |
+| File | Role |
 |---|---|
-| `Net` | WebSocket client. Handles connect/reconnect, room join, message relay. Assigns a random `me` ID per session. |
-| `CHARACTERS[]` | Static definitions: 12 characters with `baseHp`, `baseSpeed`, `ultName`, `ultCost`. No logic here. |
-| `State` | Shared mutable singleton: current screen, room code, `isHost` flag, `players` map keyed by Net ID. |
-| `ui` | DOM ref cache — all `getElementById` calls are here. |
-| `Game` | IIFE containing the entire game engine: map/wall data, bullet/particle/powerup arrays, input handling, host tick loop, renderer, snapshot serialization. |
-| `Audio` | Web Audio API sound effects. |
+| `state.js` | Shared mutable singleton (`screen`, `room`, `isHost`, `myId`, `players`, `gameMode`, `spectating`). |
+| `characters.js` | Static array of 12 character definitions (`baseHp`, `baseSpeed`, `ultName`, `ultCost`, `desc`). |
+| `maps.js` | `MAPS[]` wall layouts, `ARENA` dimensions, `mulberry32` seeded RNG, `rectHit` collision helper. |
+| `net.js` | WebSocket client. `connect(room, cb)`, `send(type, payload)`, `on(fn)`, `close()`, `id()`, `getLastSeen(peerId)`. |
+| `input.js` | Keyboard/mouse state capture. `snapshotInput()` returns current input flags. |
+| `mobile.js` | Touch joystick and ULT button overlays for mobile/landscape play. |
+| `audio.js` | Web Audio API sound effects. |
+| `lobby.js` | Lobby UI: avatar/character grid, player list render, ready/start button wiring. |
+| `lobby-net.js` | Lobby networking: `enterLobby()`, `broadcastMe()`, `broadcastRoster()`, disconnect detection. |
+| `game-loop.js` | `startMatch()`, `endMatch()`, `startGameLoop()`, `setupNetGameHandlers()`. The `requestAnimationFrame` loop lives here. |
+| `countdown.js` | Pre-match countdown overlay. |
 
-### Networking model — host-authoritative
+### js/engine/ — host-authoritative game engine
 
-- **Host** runs `hostTick(dt, now)` every frame: moves all players, resolves bullet collisions, applies powerups, tracks kills and match timer. Sends `snap` messages (~20/s) to all peers.
-- **Clients** send `input` messages (WASD + aim angle + shoot/ult flags) back to host on each received snapshot via `snapshotInput()`.
-- **`buildSnapshot(now)`** serializes full world state (players, bullets, powerups, walls, turrets, firePads). **`applySnap(s)`** deserializes it on client side.
-- Messages schema: `{ room, from, type, payload }`. Types used: `hello`, `me`, `roster`, `start`, `input`, `snap`, `sfx`, `pickup`, `killfeed`, `end`.
+| File | Role |
+|---|---|
+| `game-engine.js` | Exports mutable arrays (`bullets`, `powerups`, `hpItems`, `firePads`, `turrets`, `killFeed`). `reset(seed)` initializes map. `hostTick(dt, now)` is the authoritative simulation step called only on the host. |
+| `physics.js` | Wall array, `moveWithWalls()`, `findSpawn()`, `snapshotInput()` (sends client input to host). |
+| `snapshot.js` | `buildSnapshot(now)` serializes world state. `applySnap(s)` deserializes on clients. Ring buffer with adaptive interpolation delay (~80ms). |
+| `ult-engine.js` | `activateUlt(p, ch, now)` — per-character ultimate logic. `onKill()` — kill reward logic. |
+| `particles.js` | Visual effects: `spawnMuzzle`, `spawnHit`, `spawnPickupFx`, `shake`, `floaters`, `tickParticles`. |
+| `spawner.js` | `spawnPowerup()`, `spawnHpItem()` — random powerup/HP placement. |
 
-### Lobby flow
+### js/renderer/ — rendering
 
-1. Host clicks "Host Game" → generates 5-char room code → `enterLobby()` → `Net.connect()`.
-2. Joiner enters code → same `enterLobby()` path with `isHost = false`.
-3. Players broadcast `me` (name/avatar/ready) every 1.2s; host re-broadcasts full `roster` to sync late joiners.
-4. Host clicks "Start Match" (enabled when ≥2 players all ready) → sends `start` with seed + map index → all clients call `Game.start()`.
+| File | Role |
+|---|---|
+| `renderer.js` | `draw(ctx, ...)` — main render call. Camera lerp (`cam`). Draws walls, bullets, powerups. |
+| `draw-player.js` | Per-player draw: body, character sprite, shield, fire trail, shadow. |
+| `draw-hud.js` | `updateHUD()` — HP bars, kill feed, timer, scoreboard. |
+| `draw-powerup.js` | Powerup and HP item sprites. |
 
-### Map system
+### Networking model
 
-`MAPS[]` inside `Game` defines named wall layouts (e.g. "FORTRESS", "CROSSROADS"). `reset(seed)` picks a map, places walls, and finds valid spawn points using `findSpawn()`. The `mulberry32` seeded RNG ensures deterministic map generation from the same seed across all clients.
+- **Host** calls `hostTick(dt, now)` every frame, sends `snap` messages (~20/s) to all peers.
+- **Clients** send `input` messages (WASD + aim angle + shoot/ult flags) to host via `snapshotInput()` on each received snapshot.
+- Client-side interpolation uses a 4-frame ring buffer in `snapshot.js` with adaptive delay.
+- Message schema: `{ room, from, type, payload }`. Types: `hello`, `me`, `roster`, `start`, `input`, `snap`, `sfx`, `pickup`, `killfeed`, `spectator`, `end`.
 
-### Character ultimates
+### Game modes
 
-Each of the 12 characters has a unique ult activated by `[Q]`. Logic lives in `activateUlt(p, ch, now)` inside `hostTick`. Ult energy (`mp`) charges on damage dealt. Examples: TANK gets a shield, BLITZ teleports forward, WARDEN deploys an auto-targeting turret entity.
+`State.gameMode` is either `'classic'` (timed deathmatch) or `'survival'` (3 lives, last alive wins). Survival adds `livesLeft` and `isSpectator` fields to each player object. Spectating is tracked in `State.spectating`.
 
 ### Arena dimensions
 
-Canvas: 1280x720 px viewport. World: 1800x1200 px (`ARENA`). Camera follows local player with lerp (`cam.x += (me.x - cam.x) * 0.12`).
+Canvas: 1280×720 px viewport. World: 1800×1200 px (`ARENA`). Camera follows local player with lerp: `cam.x += (target.x - cam.x) * 0.12`.

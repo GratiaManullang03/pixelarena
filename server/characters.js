@@ -1,0 +1,17 @@
+/* server/characters.js — verbatim copy of js/characters.js (no browser APIs) */
+const CHARACTERS = [
+    { id: 0, name: 'TANK', icon: '◉', color: '#ff3b7f', desc: 'Tough brawler. Piercing shots.', baseHp: 150, baseSpeed: 185, ultName: 'FORTIFY', ultCost: 100, fireRateMs: 350, bulletDmg: 12, bulletSpeed: 680, bulletLife: 1.1, bulletSize: 5, attackType: 'pierce' },
+    { id: 1, name: 'SNIPER', icon: '✦', color: '#3bffd1', desc: 'Long range. Ult: Overcharge — next shot 3x damage.', baseHp: 80, baseSpeed: 240, ultName: 'OVERCHARGE', ultCost: 80, fireRateMs: 1500, bulletDmg: 60, bulletSpeed: 900, bulletLife: 1.5, bulletSize: 4, attackType: 'normal' },
+    { id: 2, name: 'BLITZ', icon: '✧', color: '#ffd23b', desc: 'Speed demon. Ult: Dash — teleport forward.', baseHp: 90, baseSpeed: 340, ultName: 'DASH', ultCost: 70, fireRateMs: 100, bulletDmg: 10, bulletSpeed: 720, bulletLife: 0.8, bulletSize: 3, attackType: 'normal' },
+    { id: 3, name: 'PHANTOM', icon: '▲', color: '#a78bff', desc: 'Ghost fighter. Bullets pass through walls.', baseHp: 100, baseSpeed: 260, ultName: 'CLOAK', ultCost: 90, fireRateMs: 280, bulletDmg: 18, bulletSpeed: 700, bulletLife: 1.4, bulletSize: 4, attackType: 'phase-bullet' },
+    { id: 4, name: 'BOMBER', icon: '◆', color: '#55ffa1', desc: 'Shotgun burst. Ult: Nova — 8 radial bullets.', baseHp: 100, baseSpeed: 230, ultName: 'NOVA', ultCost: 85, fireRateMs: 600, bulletDmg: 14, bulletSpeed: 680, bulletLife: 1.0, bulletSize: 4, attackType: 'spread' },
+    { id: 5, name: 'MEDIC', icon: '●', color: '#6ec8ff', desc: 'Sustain fighter. Shots heal self 5 HP on hit.', baseHp: 110, baseSpeed: 250, ultName: 'HEAL PULSE', ultCost: 75, fireRateMs: 350, bulletDmg: 16, bulletSpeed: 700, bulletLife: 1.1, bulletSize: 4, attackType: 'lifesteal-lite' },
+    { id: 6, name: 'ASSASSIN', icon: '✪', color: '#ff8a3b', desc: 'Melee dagger — no projectile, instant 80px cone.', baseHp: 80, baseSpeed: 300, ultName: 'DEATH MARK', ultCost: 90, fireRateMs: 800, bulletDmg: 45, bulletSpeed: 0, bulletLife: 0, bulletSize: 0, attackType: 'melee' },
+    { id: 7, name: 'BRUTE', icon: '✤', color: '#ff5dd8', desc: 'Knockback shots. Ult: Rampage — double fire rate 4s.', baseHp: 130, baseSpeed: 200, ultName: 'RAMPAGE', ultCost: 95, fireRateMs: 500, bulletDmg: 28, bulletSpeed: 640, bulletLife: 1.0, bulletSize: 6, attackType: 'knockback' },
+    { id: 8, name: 'GHOST', icon: '♆', color: '#b6ff3b', desc: 'Phase walker. Bullet pierces 1 player, stops at walls.', baseHp: 90, baseSpeed: 270, ultName: 'PHASE', ultCost: 80, fireRateMs: 300, bulletDmg: 20, bulletSpeed: 700, bulletLife: 1.1, bulletSize: 4, attackType: 'ghost' },
+    { id: 9, name: 'PYRO', icon: '☄', color: '#3b6bff', desc: 'Leaves fire trail while moving. Ult: Inferno.', baseHp: 95, baseSpeed: 245, ultName: 'INFERNO', ultCost: 85, fireRateMs: 250, bulletDmg: 14, bulletSpeed: 700, bulletLife: 1.0, bulletSize: 4, attackType: 'normal' },
+    { id: 10, name: 'WARDEN', icon: '⚑', color: '#ff3b3b', desc: 'Area control. Ult: Turret — deploy auto turret 5s.', baseHp: 115, baseSpeed: 215, ultName: 'TURRET', ultCost: 100, fireRateMs: 400, bulletDmg: 15, bulletSpeed: 700, bulletLife: 1.1, bulletSize: 4, attackType: 'normal' },
+    { id: 11, name: 'REAPER', icon: '⚔', color: '#3bffb6', desc: 'Soul stealer. Heals 20% of damage dealt.', baseHp: 100, baseSpeed: 255, ultName: 'SOUL DRAIN', ultCost: 90, fireRateMs: 260, bulletDmg: 18, bulletSpeed: 700, bulletLife: 1.1, bulletSize: 4, attackType: 'lifesteal' },
+];
+
+module.exports = { CHARACTERS };

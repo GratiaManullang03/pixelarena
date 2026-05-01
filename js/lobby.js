@@ -5,7 +5,6 @@ import * as Net from './net.js';
 import {
     initLobbyNet,
     broadcastMe,
-    broadcastRoster,
     enterLobby,
 } from './lobby-net.js';
 
@@ -74,7 +73,6 @@ export function renderPlayerList() {
       <div>
         <div class="name">${escape(p.name || 'Player')}</div>
         <div style="font-size:10px;color:${p.color};letter-spacing:.1em">${ch.name}</div>
-        ${p.host ? '<div class="host-tag">Host</div>' : ''}
       </div>
       <div class="ready">${p.ready ? 'Ready' : 'Not ready'}</div>
     `;
@@ -83,7 +81,7 @@ export function renderPlayerList() {
 
     const enough = ps.length >= 2;
     const allReady = enough && ps.every((p) => p.ready);
-    ui.btnStart.disabled = !(State.isHost && enough && allReady);
+    ui.btnStart.disabled = !(enough && allReady);
     ui.startHint.textContent = !enough
         ? 'Need ≥2 duelists.'
         : !allReady
@@ -102,10 +100,9 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
     ui = uiRefs;
     initLobbyNet(ui, renderAvatars, renderPlayerList, setNet);
 
-    // Mode picker (host only)
+    // Mode picker — any player can change mode before match starts
     document.querySelectorAll('.mode-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
-            if (!State.isHost) return;
             State.gameMode = btn.dataset.mode;
             document.querySelectorAll('.mode-btn').forEach((b) =>
                 b.classList.toggle('active', b.dataset.mode === State.gameMode),
@@ -114,8 +111,21 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
         });
     });
 
+    const btnCopy = document.getElementById('btnCopyCode');
+    if (btnCopy) {
+        btnCopy.onclick = () => {
+            navigator.clipboard?.writeText(State.room).then(() => {
+                btnCopy.textContent = '✔ Copied!';
+                btnCopy.classList.add('copied');
+                setTimeout(() => {
+                    btnCopy.textContent = '⎘ Copy';
+                    btnCopy.classList.remove('copied');
+                }, 2000);
+            });
+        };
+    }
+
     ui.btnHost.onclick = () => {
-        State.isHost = true;
         State.room = makeRoomCode();
         ui.roomCodeBig.textContent = State.room;
         const codeRow = document.getElementById('hostOnlyCode');
@@ -137,7 +147,6 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
             ui.joinErr.textContent = 'Enter a 5-letter code';
             return;
         }
-        State.isHost = false;
         State.room = code;
         const codeRow = document.getElementById('hostOnlyCode');
         if (codeRow) codeRow.classList.add('hide');
@@ -149,7 +158,6 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
     ui.btnLeave.onclick = () => {
         Net.close();
         State.players = {};
-        State.isHost = false;
         showFn('start');
     };
 
@@ -170,13 +178,13 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
         broadcastMe();
     };
 
+    // Any player can click Start — server validates and broadcasts to all
     ui.btnStart.onclick = () => {
-        if (!State.isHost) return;
         const ps = Object.values(State.players);
         if (ps.length < 2 || !ps.every((p) => p.ready)) return;
         const seed = Math.floor(Math.random() * 1e9);
         Net.send('start', { seed, mode: State.gameMode });
-        startMatchFn(seed, State.gameMode);
+        // Server will broadcast 'start' back to everyone including sender
     };
 
     _updateModeBadge();
@@ -192,7 +200,6 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
         });
         ui.btnReady.textContent = "I'm Ready";
         showFn('lobby');
-        if (State.isHost) broadcastRoster();
     };
 
     window._pendingStart = startMatchFn;

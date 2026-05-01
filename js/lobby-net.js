@@ -22,24 +22,7 @@ export function broadcastMe() {
         avatar: me.avatar,
         color: me.color,
         ready: me.ready,
-        host: State.isHost,
         charIdx: me.charIdx !== undefined ? me.charIdx : State.myCharIdx,
-    });
-}
-
-export function broadcastRoster() {
-    if (!State.isHost) return;
-    Net.send('roster', {
-        roster: Object.values(State.players).map((p) => ({
-            id: p.id,
-            name: p.name,
-            avatar: p.avatar,
-            color: p.color,
-            ready: p.ready,
-            host: p.host || false,
-            charIdx: p.charIdx !== undefined ? p.charIdx : 0,
-        })),
-        hostId: State.myId,
     });
 }
 
@@ -60,37 +43,22 @@ export function enterLobby(show) {
         avatar: State.myAvatar,
         color: ch.color,
         ready: false,
-        host: State.isHost,
         charIdx: State.myCharIdx,
         hp: ch.baseHp,
         maxHp: ch.baseHp,
         mp: 0,
         maxMp: ch.ultCost,
-        x: 0,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        aim: 0,
-        kills: 0,
-        alive: true,
-        powerup: null,
-        powerupUntil: 0,
-        lastShot: 0,
-        streak: 0,
-        bounty: false,
-        ultActive: false,
-        ultUntil: 0,
-        ultState: null,
-        critShots: 0,
+        x: 0, y: 0, vx: 0, vy: 0,
+        aim: 0, kills: 0, alive: true,
+        powerup: null, powerupUntil: 0,
+        lastShot: 0, streak: 0, bounty: false,
+        ultActive: false, ultUntil: 0, ultState: null, critShots: 0,
     };
     _renderPlayerList();
     Net.on((msg) => onNetMsg(msg, show));
 
-    setInterval(() => {
-        if (State.screen === 'lobby') broadcastMe();
-    }, 1200);
+    setInterval(() => { if (State.screen === 'lobby') broadcastMe(); }, 1200);
     setTimeout(broadcastMe, 400);
-    if (State.isHost) setTimeout(broadcastRoster, 700);
     setInterval(() => _checkDisconnects(), 2000);
 }
 
@@ -101,15 +69,13 @@ function _checkDisconnects() {
     Object.keys(State.players).forEach((id) => {
         if (id === State.myId) return;
         const last = Net.getLastSeen(id);
-        if (last > 0 && now - last > 5000) {
+        if (last > 0 && now - last > 10000) {
             delete State.players[id];
             changed = true;
             _showToast(`${id.slice(0, 6)} disconnected`);
         }
     });
-    if (!changed) return;
-    _renderPlayerList();
-    if (State.isHost) broadcastRoster();
+    if (changed) _renderPlayerList();
 }
 
 function _showToast(msg) {
@@ -127,9 +93,7 @@ function _showToast(msg) {
     t.textContent = msg;
     t.style.opacity = '1';
     clearTimeout(t._to);
-    t._to = setTimeout(() => {
-        t.style.opacity = '0';
-    }, 3000);
+    t._to = setTimeout(() => { t.style.opacity = '0'; }, 3000);
 }
 
 function _makePlayerSlot(data) {
@@ -140,28 +104,14 @@ function _makePlayerSlot(data) {
         avatar: data.avatar,
         color: data.color || ch.color,
         ready: !!data.ready,
-        host: !!data.host,
         charIdx: data.charIdx !== undefined ? data.charIdx : 0,
-        hp: ch.baseHp,
-        maxHp: ch.baseHp,
-        mp: 0,
-        maxMp: ch.ultCost,
-        x: 0,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        aim: 0,
-        kills: 0,
-        alive: true,
-        powerup: null,
-        powerupUntil: 0,
-        lastShot: 0,
-        streak: 0,
-        bounty: false,
-        ultActive: false,
-        ultUntil: 0,
-        ultState: null,
-        critShots: 0,
+        hp: ch.baseHp, maxHp: ch.baseHp,
+        mp: 0, maxMp: ch.ultCost,
+        x: 0, y: 0, vx: 0, vy: 0,
+        aim: 0, kills: 0, alive: true,
+        powerup: null, powerupUntil: 0,
+        lastShot: 0, streak: 0, bounty: false,
+        ultActive: false, ultUntil: 0, ultState: null, critShots: 0,
     };
 }
 
@@ -170,12 +120,11 @@ function onNetMsg(msg, show) {
         case 'hello':
             if (State.screen !== 'lobby') return;
             broadcastMe();
-            if (State.isHost) broadcastRoster();
             break;
 
         case 'me': {
             const p = msg.payload;
-            if (!p?.id || p.id !== msg.from) return;
+            if (!p?.id || p.id === State.myId) return;
             const existing = State.players[p.id] || _makePlayerSlot(p);
             State.players[p.id] = Object.assign(existing, {
                 id: p.id,
@@ -183,19 +132,17 @@ function onNetMsg(msg, show) {
                 avatar: p.avatar,
                 color: p.color || existing.color,
                 ready: !!p.ready,
-                host: !!p.host,
                 charIdx: p.charIdx !== undefined ? p.charIdx : 0,
             });
             if (State.screen === 'lobby') _renderPlayerList();
-            if (State.isHost) broadcastRoster();
             break;
         }
 
         case 'roster': {
-            if (State.isHost) return;
             const r = msg.payload.roster || [];
             const keepIds = new Set(r.map((x) => x.id));
             r.forEach((p) => {
+                if (p.id === State.myId) return;
                 const existing = State.players[p.id] || _makePlayerSlot(p);
                 State.players[p.id] = Object.assign(existing, {
                     id: p.id,
@@ -203,13 +150,11 @@ function onNetMsg(msg, show) {
                     avatar: p.avatar,
                     color: p.color,
                     ready: p.ready,
-                    host: p.host,
                     charIdx: p.charIdx !== undefined ? p.charIdx : 0,
                 });
             });
             Object.keys(State.players).forEach((id) => {
-                if (!keepIds.has(id) && id !== State.myId)
-                    delete State.players[id];
+                if (!keepIds.has(id) && id !== State.myId) delete State.players[id];
             });
             if (State.screen === 'lobby') _renderPlayerList();
             break;
@@ -225,35 +170,7 @@ function onNetMsg(msg, show) {
 }
 
 function _randomName() {
-    const A = [
-        'Neon',
-        'Pixel',
-        'Turbo',
-        'Glitch',
-        'Retro',
-        'Byte',
-        'Hex',
-        'Zap',
-        'Volt',
-        'Crypt',
-        'Void',
-        'Nova',
-    ];
-    const B = [
-        'Fox',
-        'Wolf',
-        'Cat',
-        'Owl',
-        'Rat',
-        'Bee',
-        'Ram',
-        'Fly',
-        'Cub',
-        'Ace',
-        'Jet',
-        'Orb',
-    ];
-    return (
-        A[(Math.random() * A.length) | 0] + B[(Math.random() * B.length) | 0]
-    );
+    const A = ['Neon', 'Pixel', 'Turbo', 'Glitch', 'Retro', 'Byte', 'Hex', 'Zap', 'Volt', 'Crypt', 'Void', 'Nova'];
+    const B = ['Fox', 'Wolf', 'Cat', 'Owl', 'Rat', 'Bee', 'Ram', 'Fly', 'Cub', 'Ace', 'Jet', 'Orb'];
+    return A[(Math.random() * A.length) | 0] + B[(Math.random() * B.length) | 0];
 }

@@ -1,15 +1,17 @@
 # PIXEL ARENA
 
-LAN multiplayer top-down shooter for 2–8 players. Host on one machine, others join from the same WiFi using a 5-character room code.
+Online/LAN multiplayer top-down shooter for 2–8 players. Host on one machine, others join using a 5-character room code — works over the internet or on the same WiFi.
 
-## Run
+**Play online:** deploy to Railway in ~2 minutes, no Docker needed. See [DEPLOY.md](DEPLOY.md).
+
+## Run locally
 
 ```bash
 npm install
 npm start
 ```
 
-Open `http://localhost:3001` in a browser. Share the LAN IP printed in the console to other players on the same network.
+Open `http://localhost:3001`. For LAN play, share the IP printed in the console. For internet play, deploy to Railway and share the Railway URL.
 
 ## Controls
 
@@ -49,4 +51,6 @@ Open `http://localhost:3001` in a browser. Share the LAN IP printed in the conso
 
 ## Network
 
-Pure LAN — no internet required. The Node.js server is a dumb WebSocket relay; all game logic runs in the host's browser. Clients send input, host sends snapshots at ~20/s.
+The Node.js server is a stateless WebSocket relay — all game logic runs in the host's browser. Clients send input; host sends world snapshots at ~30/s.
+
+Works both LAN and internet. For internet play, deploy the server to any Node.js host (Railway recommended — see [DEPLOY.md](DEPLOY.md)). No database, no auth, no Docker required.

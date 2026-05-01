@@ -3,8 +3,10 @@ const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { CHARACTERS } = require('./server/characters.js');
+const { createRoomState, resetRoom, hostTick } = require('./server/game-engine.js');
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // --- HTTP server to serve static files ---
 const server = http.createServer((req, res) => {
@@ -21,67 +23,196 @@ const server = http.createServer((req, res) => {
     };
 
     fs.readFile(filePath, (err, data) => {
-        if (err) {
-            res.writeHead(404);
-            res.end('Not found');
-            return;
-        }
+        if (err) { res.writeHead(404); res.end('Not found'); return; }
         res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
         res.end(data);
     });
 });
 
-// --- WebSocket relay server ---
-// Messages: { room, from, type, payload }
-// Server relays each message to all OTHER clients in the same room.
-const wss = new WebSocketServer({ server, path: '/ws' });
-
-// rooms: Map<roomCode, Set<WebSocket>>
+// --- Per-room state ---
+// rooms: Map<roomCode, { clients: Set<WebSocket>, state: roomState }>
 const rooms = new Map();
 
+function getOrCreateRoom(code) {
+    if (!rooms.has(code)) rooms.set(code, { clients: new Set(), state: createRoomState() });
+    return rooms.get(code);
+}
+
+function broadcast(room, type, payload, excludeWs = null) {
+    const msg = JSON.stringify({ type, payload });
+    for (const ws of room.clients) {
+        if (ws !== excludeWs && ws.readyState === 1) ws.send(msg);
+    }
+}
+
+function broadcastAll(room, type, payload) {
+    broadcast(room, type, payload, null);
+}
+
+function buildRanks(state) {
+    return Object.values(state.players)
+        .map((p) => ({ id: p.id, name: p.name, color: p.color, kills: p.kills || 0, charIdx: p.charIdx || 0 }))
+        .sort((a, b) => b.kills - a.kills);
+}
+
+function endMatch(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    const { state } = room;
+    if (state.intervalId) { clearInterval(state.intervalId); state.intervalId = null; }
+    state.running = false;
+    const ranks = buildRanks(state);
+    broadcastAll(room, 'end', { ranks });
+}
+
+function startRoomLoop(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    const { state } = room;
+    if (state.intervalId) clearInterval(state.intervalId);
+    state.lastTick = Date.now();
+    state.intervalId = setInterval(() => {
+        const now = Date.now();
+        const dt = Math.min(0.05, (now - state.lastTick) / 1000);
+        state.lastTick = now;
+        if (!state.running) return;
+        hostTick(
+            state, dt, now,
+            (type, payload) => broadcastAll(room, type, payload),
+            () => endMatch(roomCode),
+        );
+    }, 33);
+}
+
+// --- WebSocket server ---
+const wss = new WebSocketServer({ server, path: '/ws' });
+
 wss.on('connection', (ws) => {
-    let currentRoom = null;
+    let currentRoomCode = null;
+    let myId = null;
+
+    const keepalive = setInterval(() => {
+        if (ws.readyState === ws.OPEN) ws.ping();
+    }, 20000);
+    ws.on('pong', () => {});
+
+    function send(type, payload) {
+        if (ws.readyState === 1) ws.send(JSON.stringify({ type, payload }));
+    }
+
+    function leaveRoom() {
+        if (!currentRoomCode) return;
+        const room = rooms.get(currentRoomCode);
+        if (!room) return;
+        room.clients.delete(ws);
+        if (myId && room.state.players[myId]) {
+            delete room.state.players[myId];
+        }
+        if (room.clients.size === 0) {
+            if (room.state.intervalId) clearInterval(room.state.intervalId);
+            rooms.delete(currentRoomCode);
+        }
+        currentRoomCode = null;
+        myId = null;
+    }
 
     ws.on('message', (raw) => {
         let msg;
-        try {
-            msg = JSON.parse(raw);
-        } catch {
-            return;
+        try { msg = JSON.parse(raw); } catch { return; }
+        const { room: roomCode, from, type, payload } = msg;
+        if (!roomCode || !from) return;
+
+        // Switch rooms if needed
+        if (currentRoomCode !== roomCode) {
+            leaveRoom();
+            currentRoomCode = roomCode;
+            myId = from;
+            const room = getOrCreateRoom(roomCode);
+            room.clients.add(ws);
         }
 
-        const { room, from, type, payload } = msg;
-        if (!room || !from) return;
+        const room = rooms.get(roomCode);
+        if (!room) return;
+        const { state } = room;
 
-        // Join room on first message
-        if (currentRoom !== room) {
-            // Leave old room
-            if (currentRoom && rooms.has(currentRoom)) {
-                rooms.get(currentRoom).delete(ws);
-                if (rooms.get(currentRoom).size === 0)
-                    rooms.delete(currentRoom);
-            }
-            currentRoom = room;
-            if (!rooms.has(room)) rooms.set(room, new Set());
-            rooms.get(room).add(ws);
-        }
+        switch (type) {
+            case 'hello':
+                // Send current roster back to the new client
+                send('roster', {
+                    roster: Object.values(state.players).map((p) => ({
+                        id: p.id, name: p.name, avatar: p.avatar, color: p.color,
+                        ready: p.ready, host: false, charIdx: p.charIdx || 0,
+                    })),
+                    hostId: null,
+                });
+                // Notify others a new client joined
+                broadcast(room, 'hello', {}, ws);
+                break;
 
-        // Relay to everyone else in the same room
-        const peers = rooms.get(room);
-        if (!peers) return;
-        const data = JSON.stringify(msg);
-        for (const peer of peers) {
-            if (peer !== ws && peer.readyState === 1) {
-                peer.send(data);
+            case 'me': {
+                const p = payload;
+                if (!p?.id || p.id !== from) return;
+                const ch = CHARACTERS[p.charIdx] || CHARACTERS[0];
+                const existing = state.players[p.id] || {
+                    x: 0, y: 0, vx: 0, vy: 0, hp: ch.baseHp, maxHp: ch.baseHp,
+                    mp: 0, maxMp: ch.ultCost, alive: true, kills: 0, aim: 0,
+                    powerup: null, powerupUntil: 0, lastShot: 0, respawnAt: 0,
+                    streak: 0, bounty: false, ultActive: false, ultUntil: 0,
+                    ultState: null, critShots: 0, lastUlt: 0,
+                    _lastFire: 0, _pyroLastPassive: 0,
+                    livesLeft: 3, isSpectator: false, inputBuf: null,
+                };
+                state.players[p.id] = Object.assign(existing, {
+                    id: p.id, name: p.name, avatar: p.avatar,
+                    color: p.color || ch.color, ready: !!p.ready,
+                    charIdx: p.charIdx !== undefined ? p.charIdx : 0,
+                });
+                // Relay me to all peers so lobby stays in sync
+                broadcast(room, 'me', { ...state.players[p.id], host: false }, ws);
+                break;
             }
+
+            case 'input':
+                if (state.players[from]) state.players[from].inputBuf = payload;
+                break;
+
+            case 'start': {
+                const seed = payload?.seed ?? Math.floor(Math.random() * 1e9);
+                const mode = payload?.mode || 'classic';
+                state.gameMode = mode;
+                resetRoom(state, seed);
+                const now = Date.now();
+                const duration = mode === 'survival' ? 30 * 60 * 1000 : 3 * 60 * 1000;
+                state.matchStart = now;
+                state.matchEnd = now + duration;
+                state.running = false;
+                // Send start to all clients (including sender) so countdown fires everywhere
+                broadcastAll(room, 'start', { seed, mode });
+                // Delay running=true by 3s to match the client countdown
+                setTimeout(() => {
+                    if (rooms.has(roomCode)) {
+                        rooms.get(roomCode).state.running = true;
+                    }
+                }, 3000);
+                startRoomLoop(roomCode);
+                break;
+            }
+
+            default:
+                // Relay anything else (sfx, spectator, etc.) to peers
+                broadcast(room, type, payload, ws);
+                break;
         }
     });
 
     ws.on('close', () => {
-        if (currentRoom && rooms.has(currentRoom)) {
-            rooms.get(currentRoom).delete(ws);
-            if (rooms.get(currentRoom).size === 0) rooms.delete(currentRoom);
-        }
+        clearInterval(keepalive);
+        leaveRoom();
+    });
+
+    ws.on('error', () => {
+        clearInterval(keepalive);
+        leaveRoom();
     });
 });
 
@@ -91,9 +222,7 @@ function getLocalIPs() {
     const ips = [];
     for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]) {
-            if (iface.family === 'IPv4' && !iface.internal) {
-                ips.push({ name, address: iface.address });
-            }
+            if (iface.family === 'IPv4' && !iface.internal) ips.push({ name, address: iface.address });
         }
     }
     return ips;
@@ -101,15 +230,17 @@ function getLocalIPs() {
 
 server.listen(PORT, '0.0.0.0', () => {
     const ips = getLocalIPs();
-    console.log('\n=== PIXEL ARENA SERVER ===');
+    console.log('\n=== PIXEL ARENA SERVER (server-authoritative) ===');
     console.log(`\nServer berjalan di port ${PORT}`);
-    console.log('\nBagikan salah satu URL ini ke teman satu jaringan:');
-    if (ips.length === 0) {
-        console.log(`  http://localhost:${PORT}`);
+    if (process.env.PORT) {
+        console.log('\nRunning on Railway. Share the Railway URL with friends.\n');
     } else {
-        ips.forEach((ip) => {
-            console.log(`  [${ip.name}] http://${ip.address}:${PORT}`);
-        });
+        console.log('\nBagikan salah satu URL ini ke teman satu jaringan:');
+        if (ips.length === 0) {
+            console.log(`  http://localhost:${PORT}`);
+        } else {
+            ips.forEach((ip) => console.log(`  [${ip.name}] http://${ip.address}:${PORT}`));
+        }
+        console.log('\nTeman harus terhubung ke WiFi/hotspot yang sama.\n');
     }
-    console.log('\nTeman harus terhubung ke WiFi/hotspot yang sama.\n');
 });

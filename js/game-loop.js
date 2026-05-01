@@ -4,12 +4,9 @@ import { CHARACTERS } from './characters.js';
 import { setMatchStartTime } from './input.js';
 import * as Net from './net.js';
 import * as Audio from './audio.js';
-import {
-    reset, hostTick, bullets, powerups, hpItems, firePads, turrets,
-    killFeed, pushKillFeed,
-} from './engine/game-engine.js';
-import { applySnap, getInterpolated, getInterpDelay } from './engine/snapshot.js';
-import { snapshotInput } from './engine/physics.js';
+import { bullets, powerups, hpItems, firePads, turrets, killFeed, pushKillFeed } from './engine/game-engine.js';
+import { applySnap, getInterpolated, getInterpDelay, resetWallsReceived } from './engine/snapshot.js';
+import { snapshotInput, setWalls } from './engine/physics.js';
 import { spawnMuzzle, spawnHit, spawnPickupFx, shake, tickParticles, clearFx } from './engine/particles.js';
 import { draw, cam } from './renderer/renderer.js';
 import { updateHUD } from './renderer/draw-hud.js';
@@ -42,14 +39,13 @@ export function startMatch(seed, mode) {
     const spectateEl = document.getElementById('spectateOverlay');
     if (spectateEl) spectateEl.classList.remove('active');
     clearFx();
-    reset(seed);
-    // Survival: add livesLeft to each player
+    resetWallsReceived();
+    // Survival: prepare livesLeft client-side (server will authoritative set, but prepping for display)
     if (State.gameMode === 'survival') {
         Object.values(State.players).forEach((p) => {
             p.livesLeft = 3;
             p.isSpectator = false;
         });
-        State.matchEnd = State.matchStart + 30 * 60 * 1000; // no timer limit
     }
     State.matchStart = performance.now();
     State.matchEnd = State.gameMode === 'survival'
@@ -82,12 +78,6 @@ export function endMatch(ranks) {
     </div>`;
     }).join('');
     _ui.end.style.display = 'flex';
-}
-
-function buildRanks() {
-    return Object.values(State.players)
-        .map((p) => ({ id: p.id, name: p.name, color: p.color, kills: p.kills || 0, charIdx: p.charIdx || 0 }))
-        .sort((a, b) => b.kills - a.kills);
 }
 
 function _initSpectateControls() {
@@ -128,14 +118,11 @@ export function setupNetGameHandlers() {
     _initSpectateControls();
     Net.on((msg) => {
         switch (msg.type) {
-            case 'input':
-                if (State.isHost) {
-                    const p = State.players[msg.from];
-                    if (p) p.inputBuf = msg.payload;
-                }
+            case 'walls':
+                setWalls(msg.payload.walls);
                 break;
             case 'snapshot':
-                if (!State.isHost && State.running)
+                if (State.running)
                     applySnap(msg.payload, bullets, powerups, hpItems, firePads, turrets);
                 break;
             case 'shot':
@@ -151,6 +138,11 @@ export function setupNetGameHandlers() {
             case 'pickup':
                 Audio.pickup();
                 spawnPickupFx(msg.payload.x, msg.payload.y);
+                break;
+            case 'sfx':
+                if (msg.payload.sfx === 'boom') Audio.boom();
+                else if (msg.payload.sfx === 'pickup') Audio.pickup();
+                else if (msg.payload.sfx === 'ult') Audio.ult();
                 break;
             case 'killfeed':
                 pushKillFeed(msg.payload);
@@ -174,30 +166,20 @@ export function startGameLoop(ctx) {
         last = now;
         if (!State.running) return;
 
-        if (State.isHost) {
+        // Send input to server every 33ms
+        if (!loop._lastInput || now - loop._lastInput > 33) {
+            loop._lastInput = now;
             const me = State.players[State.myId];
-            if (me && !me.isSpectator) me.inputBuf = snapshotInput(me, cam, _W, _H);
-            if (me?.isSpectator && !State.spectating) _activateSpectate(State.myId);
-            hostTick(dt, now, () => {
-                const ranks = buildRanks();
-                Net.send('end', { ranks });
-                endMatch(ranks);
-            });
-            tickParticles(dt);
-            draw(ctx, _W, _H, now, State.players, bullets, powerups, hpItems, firePads, turrets, killFeed);
-        } else {
-            if (!loop._lastInput || now - loop._lastInput > 33) {
-                loop._lastInput = now;
-                const me = State.players[State.myId];
-                const inp = snapshotInput(me, cam, _W, _H);
-                if (inp) Net.send('input', inp);
-            }
-            bullets.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
-            tickParticles(dt);
-            const playerMap = getInterpolated(now - getInterpDelay()) || State.players;
-            draw(ctx, _W, _H, now, playerMap, bullets, powerups, hpItems, firePads, turrets, killFeed);
+            const inp = snapshotInput(me, cam, _W, _H);
+            if (inp) Net.send('input', inp);
         }
 
+        // Extrapolate bullets locally for smooth visuals between snapshots
+        bullets.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
+        tickParticles(dt);
+
+        const playerMap = getInterpolated(now - getInterpDelay()) || State.players;
+        draw(ctx, _W, _H, now, playerMap, bullets, powerups, hpItems, firePads, turrets, killFeed);
         updateHUD(_ui, now, powerups);
     }
 

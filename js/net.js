@@ -12,7 +12,8 @@ function rid() {
 }
 
 function tryConnect() {
-    const wsUrl = `ws://${location.host}/ws`;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${location.host}/ws`;
     onStatus('wait', 'Connecting…');
     try {
         ws = new WebSocket(wsUrl);
@@ -23,7 +24,8 @@ function tryConnect() {
 
     ws.onopen = () => {
         reconnectTries = 0;
-        onStatus('ok', 'Connected · LAN');
+        const label = location.protocol === 'https:' ? 'Connected · Online' : 'Connected · LAN';
+        onStatus('ok', label);
         send('hello', {});
     };
     ws.onmessage = (ev) => {
@@ -41,9 +43,10 @@ function tryConnect() {
     ws.onerror = () => {};
     ws.onclose = () => {
         onStatus('err', 'Disconnected');
-        if (reconnectTries < 5) {
+        if (reconnectTries < 10) {
+            const delay = Math.min(1000 * 2 ** reconnectTries, 15000);
             reconnectTries++;
-            setTimeout(tryConnect, 1000);
+            setTimeout(tryConnect, delay);
         }
     };
 }
