@@ -61,9 +61,9 @@ Railway membuat **1 service** saja:
 
 | Service | Tipe | Keterangan |
 |---------|------|-----------|
-| `pixel-arena` | Web Service (Node.js) | Menjalankan `server.js` — melayani file statis (HTML/CSS/JS) sekaligus WebSocket relay di path `/ws` |
+| `pixel-arena` | Web Service (Node.js) | Menjalankan `server.js` — melayani file statis (HTML/CSS/JS), WebSocket di `/ws`, **dan menjalankan semua game logic** (physics, bullets, collision) di server |
 
-Tidak ada database, tidak ada worker terpisah, tidak ada Redis. Satu service sudah cukup karena server ini stateless (room hanya ada di memory selama server hidup).
+Tidak ada database, tidak ada worker terpisah, tidak ada Redis. Satu service sudah cukup. Server sekarang **server-authoritative** — semua perhitungan game (pergerakan, peluru, ultimate) berjalan di Railway, bukan di browser pemain mana pun.
 
 ---
 
@@ -128,9 +128,9 @@ Railway memberikan **$5 credit gratis per bulan**. Untuk server Node.js ringan s
 
 | Resource | Estimasi pemakaian |
 |----------|--------------------|
-| RAM | ~50–80 MB |
-| CPU | sangat kecil (idle relay) |
-| Estimasi biaya | ~$0.50–1.00/bulan |
+| RAM | ~60–100 MB |
+| CPU | kecil — game loop 30 Hz per room, berjalan di Node.js |
+| Estimasi biaya | ~$0.50–1.50/bulan |
 | Sisa credit untuk main | ~$4–4.50/bulan |
 
 Credit $5/bulan cukup untuk server ini hidup terus-menerus. Railway tidak mematikan server seperti Render (yang sleep setelah 15 menit idle).

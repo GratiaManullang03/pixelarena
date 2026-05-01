@@ -148,7 +148,7 @@ function _processPlayer(state, p, dt, now, broadcast) {
         if (p.isSpectator) return;
         if (now >= p.respawnAt) {
             const ch = CHARACTERS[p.charIdx] || CHARACTERS[0];
-            const s = findSpawn();
+            const s = findSpawn(state.walls);
             Object.assign(p, { alive: true, hp: ch.baseHp, mp: 0, streak: 0, x: s.x, y: s.y, vx: 0, vy: 0 });
         }
         return;
@@ -173,7 +173,7 @@ function _movePlayer(state, p, ch, ip, dt, now) {
         p.x = Math.max(20, Math.min(ARENA.w - 20, p.x + p.vx * dt));
         p.y = Math.max(20, Math.min(ARENA.h - 20, p.y + p.vy * dt));
     } else {
-        moveWithWalls(p, dt);
+        moveWithWalls(p, dt, state.walls);
     }
 }
 

@@ -130,8 +130,6 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
         ui.roomCodeBig.textContent = State.room;
         const codeRow = document.getElementById('hostOnlyCode');
         if (codeRow) codeRow.classList.remove('hide');
-        const hostWrap = document.getElementById('hostStartWrap');
-        if (hostWrap) hostWrap.style.display = '';
         enterLobby(showFn);
     };
 
@@ -150,8 +148,6 @@ export function initLobby(uiRefs, showFn, startMatchFn) {
         State.room = code;
         const codeRow = document.getElementById('hostOnlyCode');
         if (codeRow) codeRow.classList.add('hide');
-        const hostWrap = document.getElementById('hostStartWrap');
-        if (hostWrap) hostWrap.style.display = 'none';
         enterLobby(showFn);
     };
 

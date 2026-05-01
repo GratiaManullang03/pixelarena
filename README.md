@@ -51,6 +51,6 @@ Open `http://localhost:3001`. For LAN play, share the IP printed in the console.
 
 ## Network
 
-The Node.js server is a stateless WebSocket relay — all game logic runs in the host's browser. Clients send input; host sends world snapshots at ~30/s.
+The Node.js server is **server-authoritative** — all game logic (physics, bullets, collisions, ultimates) runs on the server. Every client is equal: they send input, receive world snapshots at ~30 Hz, and render with client-side interpolation. Lag is independent of any player's connection quality.
 
-Works both LAN and internet. For internet play, deploy the server to any Node.js host (Railway recommended — see [DEPLOY.md](DEPLOY.md)). No database, no auth, no Docker required.
+Works both LAN and internet. For internet play, deploy to Railway (see [DEPLOY.md](DEPLOY.md)). No database, no auth, no Docker required.

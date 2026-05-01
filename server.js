@@ -38,15 +38,19 @@ function getOrCreateRoom(code) {
     return rooms.get(code);
 }
 
-function broadcast(room, type, payload, excludeWs = null) {
-    const msg = JSON.stringify({ type, payload });
+// All server-originated messages include room + from:'__server__' so net.js filters correctly
+function broadcastAll(roomCode, room, type, payload) {
+    const msg = JSON.stringify({ room: roomCode, from: '__server__', type, payload });
     for (const ws of room.clients) {
-        if (ws !== excludeWs && ws.readyState === 1) ws.send(msg);
+        if (ws.readyState === 1) ws.send(msg);
     }
 }
 
-function broadcastAll(room, type, payload) {
-    broadcast(room, type, payload, null);
+function broadcastExcept(roomCode, room, type, payload, excludeWs) {
+    const msg = JSON.stringify({ room: roomCode, from: '__server__', type, payload });
+    for (const ws of room.clients) {
+        if (ws !== excludeWs && ws.readyState === 1) ws.send(msg);
+    }
 }
 
 function buildRanks(state) {
@@ -61,8 +65,7 @@ function endMatch(roomCode) {
     const { state } = room;
     if (state.intervalId) { clearInterval(state.intervalId); state.intervalId = null; }
     state.running = false;
-    const ranks = buildRanks(state);
-    broadcastAll(room, 'end', { ranks });
+    broadcastAll(roomCode, room, 'end', { ranks: buildRanks(state) });
 }
 
 function startRoomLoop(roomCode) {
@@ -78,7 +81,7 @@ function startRoomLoop(roomCode) {
         if (!state.running) return;
         hostTick(
             state, dt, now,
-            (type, payload) => broadcastAll(room, type, payload),
+            (type, payload) => broadcastAll(roomCode, room, type, payload),
             () => endMatch(roomCode),
         );
     }, 33);
@@ -96,21 +99,22 @@ wss.on('connection', (ws) => {
     }, 20000);
     ws.on('pong', () => {});
 
-    function send(type, payload) {
-        if (ws.readyState === 1) ws.send(JSON.stringify({ type, payload }));
+    // Direct message to this client only (for roster on join)
+    function sendDirect(roomCode, type, payload) {
+        if (ws.readyState === 1)
+            ws.send(JSON.stringify({ room: roomCode, from: '__server__', type, payload }));
     }
 
     function leaveRoom() {
         if (!currentRoomCode) return;
         const room = rooms.get(currentRoomCode);
-        if (!room) return;
-        room.clients.delete(ws);
-        if (myId && room.state.players[myId]) {
-            delete room.state.players[myId];
-        }
-        if (room.clients.size === 0) {
-            if (room.state.intervalId) clearInterval(room.state.intervalId);
-            rooms.delete(currentRoomCode);
+        if (room) {
+            room.clients.delete(ws);
+            if (myId && room.state.players[myId]) delete room.state.players[myId];
+            if (room.clients.size === 0) {
+                if (room.state.intervalId) clearInterval(room.state.intervalId);
+                rooms.delete(currentRoomCode);
+            }
         }
         currentRoomCode = null;
         myId = null;
@@ -127,8 +131,7 @@ wss.on('connection', (ws) => {
             leaveRoom();
             currentRoomCode = roomCode;
             myId = from;
-            const room = getOrCreateRoom(roomCode);
-            room.clients.add(ws);
+            getOrCreateRoom(roomCode).clients.add(ws);
         }
 
         const room = rooms.get(roomCode);
@@ -137,16 +140,14 @@ wss.on('connection', (ws) => {
 
         switch (type) {
             case 'hello':
-                // Send current roster back to the new client
-                send('roster', {
+                sendDirect(roomCode, 'roster', {
                     roster: Object.values(state.players).map((p) => ({
                         id: p.id, name: p.name, avatar: p.avatar, color: p.color,
-                        ready: p.ready, host: false, charIdx: p.charIdx || 0,
+                        ready: !!p.ready, charIdx: p.charIdx || 0,
                     })),
-                    hostId: null,
                 });
-                // Notify others a new client joined
-                broadcast(room, 'hello', {}, ws);
+                // Tell existing peers a new player connected
+                broadcastExcept(roomCode, room, 'hello', {}, ws);
                 break;
 
             case 'me': {
@@ -167,8 +168,8 @@ wss.on('connection', (ws) => {
                     color: p.color || ch.color, ready: !!p.ready,
                     charIdx: p.charIdx !== undefined ? p.charIdx : 0,
                 });
-                // Relay me to all peers so lobby stays in sync
-                broadcast(room, 'me', { ...state.players[p.id], host: false }, ws);
+                // Relay to all peers so lobby stays in sync
+                broadcastExcept(roomCode, room, 'me', { ...state.players[p.id] }, ws);
                 break;
             }
 
@@ -186,13 +187,11 @@ wss.on('connection', (ws) => {
                 state.matchStart = now;
                 state.matchEnd = now + duration;
                 state.running = false;
-                // Send start to all clients (including sender) so countdown fires everywhere
-                broadcastAll(room, 'start', { seed, mode });
-                // Delay running=true by 3s to match the client countdown
+                // Broadcast start to ALL clients (including sender) — countdown fires for everyone
+                broadcastAll(roomCode, room, 'start', { seed, mode });
+                // running=true after 3s to match client countdown
                 setTimeout(() => {
-                    if (rooms.has(roomCode)) {
-                        rooms.get(roomCode).state.running = true;
-                    }
+                    if (rooms.has(roomCode)) rooms.get(roomCode).state.running = true;
                 }, 3000);
                 startRoomLoop(roomCode);
                 break;
@@ -200,20 +199,13 @@ wss.on('connection', (ws) => {
 
             default:
                 // Relay anything else (sfx, spectator, etc.) to peers
-                broadcast(room, type, payload, ws);
+                broadcastExcept(roomCode, room, type, payload, ws);
                 break;
         }
     });
 
-    ws.on('close', () => {
-        clearInterval(keepalive);
-        leaveRoom();
-    });
-
-    ws.on('error', () => {
-        clearInterval(keepalive);
-        leaveRoom();
-    });
+    ws.on('close', () => { clearInterval(keepalive); leaveRoom(); });
+    ws.on('error', () => { clearInterval(keepalive); leaveRoom(); });
 });
 
 // --- Print local IP addresses ---
