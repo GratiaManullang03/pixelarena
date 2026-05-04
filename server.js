@@ -146,6 +146,9 @@ wss.on('connection', (ws) => {
                         ready: !!p.ready, charIdx: p.charIdx || 0,
                     })),
                 });
+                // Send walls immediately if a match is already running
+                if (state.running && state.walls.length > 0)
+                    sendDirect(roomCode, 'walls', { walls: state.walls });
                 // Tell existing peers a new player connected
                 broadcastExcept(roomCode, room, 'hello', {}, ws);
                 break;

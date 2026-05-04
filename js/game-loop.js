@@ -122,6 +122,7 @@ export function setupNetGameHandlers() {
                 setWalls(msg.payload.walls);
                 break;
             case 'snapshot':
+                if (msg.payload.walls) setWalls(msg.payload.walls);
                 if (State.running)
                     applySnap(msg.payload, bullets, powerups, hpItems, firePads, turrets);
                 break;

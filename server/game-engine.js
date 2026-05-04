@@ -26,7 +26,6 @@ function createRoomState() {
         lastSpawn: 0,
         lastHpSpawn: 0,
         lastSnap: 0,
-        _earlySnapCount: 0,
         intervalId: null,
     };
 }
@@ -40,7 +39,6 @@ function resetRoom(state, seed) {
     state.killFeed.length = 0;
     state.nextBulletId = 1;
     state.nextPupId = 1;
-    state._earlySnapCount = 0;
 
     state.currentMapIndex = (seed >>> 0) % MAPS.length;
     const map = MAPS[state.currentMapIndex];
@@ -131,8 +129,7 @@ function hostTick(state, dt, now, broadcast, endMatchCallback) {
     if (now - state.lastSnap > 33) {
         state.lastSnap = now;
         const snap = buildSnapshot(state, now);
-        // Include walls in first 5 snapshots as fallback for packet loss
-        if (state._earlySnapCount < 5) { snap.walls = state.walls; state._earlySnapCount++; }
+        snap.walls = state.walls;
         broadcast('snapshot', snap);
     }
 

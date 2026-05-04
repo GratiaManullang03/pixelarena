@@ -5,7 +5,7 @@ import { setWalls } from './physics.js';
 // Ring buffer: 4 frames for smoother interpolation under packet loss
 const SNAP_BUF = 4;
 const snapBuffer = [];
-let _interpDelay = 80; // adaptive interpolation delay in ms
+let _interpDelay = 50; // adaptive interpolation delay in ms
 let _wallsReceived = false;
 
 function clamp01(v) {
@@ -28,7 +28,7 @@ export function pushSnapshot(snap, receivedAt) {
         for (let i = 1; i < snapBuffer.length; i++)
             intervals.push(snapBuffer[i].receivedAt - snapBuffer[i - 1].receivedAt);
         const avg = intervals.reduce((s, v) => s + v, 0) / intervals.length;
-        _interpDelay = Math.max(40, Math.min(150, avg * 1.5));
+        _interpDelay = Math.max(33, Math.min(80, avg * 1.2));
     }
 }
 
