@@ -5,7 +5,8 @@ import { setMatchStartTime } from './input.js';
 import * as Net from './net.js';
 import * as Audio from './audio.js';
 import { bullets, powerups, hpItems, firePads, turrets, killFeed, pushKillFeed } from './engine/game-engine.js';
-import { applySnap, getInterpolated, getInterpDelay, resetWallsReceived } from './engine/snapshot.js';
+import { applySnap, getInterpolated, resetWallsReceived } from './engine/snapshot.js';
+import * as Prediction from './engine/prediction.js';
 import { snapshotInput, setWalls } from './engine/physics.js';
 import { spawnMuzzle, spawnHit, spawnPickupFx, shake, tickParticles, clearFx } from './engine/particles.js';
 import { draw, cam } from './renderer/renderer.js';
@@ -40,6 +41,7 @@ export function startMatch(seed, mode) {
     if (spectateEl) spectateEl.classList.remove('active');
     clearFx();
     resetWallsReceived();
+    Prediction.reset();
     // Survival: prepare livesLeft client-side (server will authoritative set, but prepping for display)
     if (State.gameMode === 'survival') {
         Object.values(State.players).forEach((p) => {
@@ -167,19 +169,31 @@ export function startGameLoop(ctx) {
         last = now;
         if (!State.running) return;
 
-        // Send input to server every 33ms
+        // Send input to server every 33ms + advance local prediction
         if (!loop._lastInput || now - loop._lastInput > 33) {
+            const stepDt = loop._lastInput
+                ? Math.min(0.05, (now - loop._lastInput) / 1000)
+                : 0.033;
             loop._lastInput = now;
             const me = State.players[State.myId];
             const inp = snapshotInput(me, cam, _W, _H);
-            if (inp) Net.send('input', inp);
+            if (inp) {
+                const seq = Prediction.advance(inp, stepDt);
+                Net.send('input', { ...inp, seq });
+            }
         }
 
         // Extrapolate bullets locally for smooth visuals between snapshots
         bullets.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
         tickParticles(dt);
 
-        const playerMap = getInterpolated(now - getInterpDelay()) || State.players;
+        const playerMap = getInterpolated(now) || State.players;
+        // Render the local player from the predicted position (no round-trip lag)
+        const pred = Prediction.get();
+        const meRender = playerMap[State.myId];
+        if (pred && meRender) {
+            playerMap[State.myId] = { ...meRender, x: pred.x, y: pred.y, aim: Prediction.getAim() };
+        }
         draw(ctx, _W, _H, now, playerMap, bullets, powerups, hpItems, firePads, turrets, killFeed);
         updateHUD(_ui, now, powerups);
     }

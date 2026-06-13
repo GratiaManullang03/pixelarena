@@ -128,9 +128,8 @@ function hostTick(state, dt, now, broadcast, endMatchCallback) {
 
     if (now - state.lastSnap > 33) {
         state.lastSnap = now;
-        const snap = buildSnapshot(state, now);
-        snap.walls = state.walls;
-        broadcast('snapshot', snap);
+        // Walls are sent once on match start / join — not in every snapshot.
+        broadcast('snapshot', buildSnapshot(state, now));
     }
 
     if (now >= state.matchEnd) endMatchCallback();
@@ -139,6 +138,8 @@ function hostTick(state, dt, now, broadcast, endMatchCallback) {
 function _processPlayer(state, p, dt, now, broadcast) {
     const ip = p.inputBuf;
     if (!ip) return;
+    // Acknowledge the latest input seq so the client can reconcile its prediction.
+    if (ip.seq !== undefined) p._ackSeq = ip.seq;
     p.aim = ip.aim;
 
     if (!p.alive) {

@@ -18,6 +18,8 @@ node server.js
 # Share LAN IP printed in console to other players on same network
 ```
 
+`PORT` env var overrides the default 3001 (used by Railway deploys — see `DEPLOY.md`). The server binds `0.0.0.0`. No build step: static files are served directly.
+
 No test suite is configured (`npm test` is a placeholder).
 
 ## Architecture
@@ -46,8 +48,10 @@ Browser C ──► input ──┘
 | `snapshot.js` | `buildSnapshot(state, now)` — serializes world state for broadcast. |
 | `ult-engine.js` | `activateUlt(state, p, ch, now, broadcast)`, `onKill(...)` — ultimate abilities. Audio replaced by `broadcast('sfx', ...)`. |
 | `spawner.js` | `spawnPowerup(rng, walls, ...)`, `spawnHpItem(...)` — pickup placement. |
-| `maps.js` | `MAPS[]`, `ARENA`, `mulberry32`, `rectHit` — verbatim copy of `js/maps.js`. |
-| `characters.js` | `CHARACTERS[]` — verbatim copy of `js/characters.js`. |
+| `maps.js` | `MAPS[]`, `ARENA`, `mulberry32`, `rectHit` — data-identical to `js/maps.js`, differs only in module syntax (CommonJS `module.exports` vs ESM `export`). |
+| `characters.js` | `CHARACTERS[]` — data-identical to `js/characters.js`, CommonJS instead of ESM. |
+
+**Sync gotcha:** `maps.js` and `characters.js` are duplicated between `js/` (ESM, client) and `server/` (CommonJS). Edit both copies when changing map layouts or character stats, or client rendering and server simulation will disagree.
 
 ### js/ module map (browser, ES modules)
 
@@ -71,7 +75,8 @@ Browser C ──► input ──┘
 |---|---|
 | `game-engine.js` | Client render arrays only (`bullets`, `powerups`, `hpItems`, `firePads`, `turrets`, `killFeed`, `pushKillFeed`). No simulation logic. |
 | `physics.js` | `walls[]`, `setWalls()`, `moveWithWalls()`, `snapshotInput()`. Walls updated by `applySnap`. |
-| `snapshot.js` | `applySnap(s)` deserializes server snapshots. Ring buffer interpolation (4 frames, adaptive 40–150ms delay). `matchEnd` converted from server `Date.now()` to local `performance.now()`. |
+| `snapshot.js` | `applySnap(s)` deserializes server snapshots. **Time-based** interpolation: 16-frame ring buffer keyed by the server timestamp `snap.t` (not local arrival), with a smoothed client↔server clock offset and a render delay of `clamp(avgInterval*2, 60–120ms)`. On each snapshot, calls `Prediction.reconcile` for the local player. `matchEnd` converted from server `Date.now()` to local `performance.now()`. |
+| `prediction.js` | **Client-side prediction for the LOCAL player only.** `advance(input, dt)` tags an input `seq`, simulates the local player immediately, and returns the seq to send. `reconcile(serverP, ackSeq)` snaps to the authoritative position and replays unacked inputs. Its movement model **must mirror** `server/game-engine.js _movePlayer`. Remote players are interpolated (snapshot.js); only the local player is predicted. |
 | `ult-engine.js` | **Unused by client** — all ult logic is on server. |
 | `particles.js` | Visual effects: muzzle flash, hit sparks, floaters, camera shake. |
 | `spawner.js` | **Unused by client** — pickup spawning is on server. |
@@ -88,9 +93,12 @@ Browser C ──► input ──┘
 ### Networking model
 
 - **Server** runs `hostTick` per room at ~30 Hz via `setInterval`. Sends `snapshot` to all clients.
-- **Clients** send `input` messages (WASD + aim + shoot/ult flags) every 33ms.
+- **Clients** send `input` messages (WASD + aim + shoot/ult flags + monotonic `seq`) every 33ms.
 - Server broadcasts use `{ room, from: '__server__', type, payload }`. Client `net.js` accepts these (only drops `from === myId`).
-- Client-side interpolation: 4-frame ring buffer with adaptive delay.
+- **Local player is client-side predicted** (`js/engine/prediction.js`); the server echoes the last processed input `seq` per player as `aSeq` in the snapshot, and the client reconciles by replaying unacked inputs. Remote players are interpolated.
+- Interpolation is **time-based** off the server timestamp `snap.t` with a ~60–120ms render delay (see `snapshot.js`).
+- **Walls are static**: sent once via the `walls` message on match `start` and on join (`hello` while running) — NOT in every snapshot.
+- WebSocket uses `perMessageDeflate` compression (`server.js`); snapshot JSON compresses well.
 - Message types: `hello`, `me`, `roster`, `start`, `input`, `snapshot`, `shot`, `hit`, `sfx`, `pickup`, `killfeed`, `spectator`, `end`, `walls`.
 
 ### Game modes

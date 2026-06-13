@@ -88,7 +88,19 @@ function startRoomLoop(roomCode) {
 }
 
 // --- WebSocket server ---
-const wss = new WebSocketServer({ server, path: '/ws' });
+// permessage-deflate: snapshot JSON is highly repetitive, compresses ~60-80%.
+// threshold avoids spending CPU on tiny control messages.
+const wss = new WebSocketServer({
+    server,
+    path: '/ws',
+    perMessageDeflate: {
+        threshold: 256,
+        zlibDeflateOptions: { level: 6, memLevel: 8 },
+        concurrencyLimit: 10,
+        serverNoContextTakeover: false,
+        clientNoContextTakeover: false,
+    },
+});
 
 wss.on('connection', (ws) => {
     let currentRoomCode = null;
@@ -192,6 +204,8 @@ wss.on('connection', (ws) => {
                 state.running = false;
                 // Broadcast start to ALL clients (including sender) — countdown fires for everyone
                 broadcastAll(roomCode, room, 'start', { seed, mode });
+                // Walls are static for the whole match — send once here instead of in every snapshot
+                broadcastAll(roomCode, room, 'walls', { walls: state.walls });
                 // running=true after 3s to match client countdown
                 setTimeout(() => {
                     if (rooms.has(roomCode)) rooms.get(roomCode).state.running = true;

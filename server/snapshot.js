@@ -30,6 +30,7 @@ function buildSnapshot(state, now) {
             critShots: p.critShots || 0,
             livesLeft: p.livesLeft !== undefined ? p.livesLeft : 3,
             isSpectator: !!p.isSpectator,
+            aSeq: p._ackSeq || 0,
         })),
         bullets: bullets.map((b) => ({
             id: b.id,
