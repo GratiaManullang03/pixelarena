@@ -1,0 +1,26 @@
+# Normalisasi line endings — cegah masalah CRLF/LF antara dev (Linux) dan VPS
+* text=auto eol=lf
+
+# File teks eksplisit
+*.js      text eol=lf
+*.mjs     text eol=lf
+*.cjs     text eol=lf
+*.json    text eol=lf
+*.html    text eol=lf
+*.css     text eol=lf
+*.md      text eol=lf
+*.svg     text eol=lf
+Dockerfile text eol=lf
+
+# Binary — jangan diutak-atik
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.mp3     binary
+*.wav     binary
+*.ogg     binary
