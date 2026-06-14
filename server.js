@@ -9,21 +9,48 @@ const { createRoomState, resetRoom, hostTick } = require('./server/game-engine.j
 const PORT = process.env.PORT || 3001;
 
 // --- HTTP server to serve static files ---
-const server = http.createServer((req, res) => {
-    const urlPath = req.url === '/' ? '/index.html' : req.url;
-    const filePath = path.join(__dirname, urlPath);
-    const ext = path.extname(filePath);
-    const mimeTypes = {
-        '.html': 'text/html',
-        '.css': 'text/css',
-        '.js': 'application/javascript',
-        '.json': 'application/json',
-        '.png': 'image/png',
-        '.ico': 'image/x-icon',
-    };
+const ERROR_DIR = path.join(__dirname, 'error-pages');
+const ERROR_FILES = { 400: '400.html', 403: '403.html', 404: '404.html', 500: '500.html' };
 
+// Serve a themed error page (falls back to plain text if the file is missing).
+function sendError(res, code) {
+    const file = path.join(ERROR_DIR, ERROR_FILES[code] || '500.html');
+    fs.readFile(file, (err, body) => {
+        if (err) { res.writeHead(code, { 'Content-Type': 'text/plain' }); res.end(String(code)); return; }
+        res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(body);
+    });
+}
+
+const mimeTypes = {
+    '.html': 'text/html; charset=utf-8',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.ico': 'image/x-icon',
+};
+
+const server = http.createServer((req, res) => {
+    let urlPath;
+    try {
+        urlPath = decodeURIComponent(req.url.split('?')[0]);
+    } catch (e) {
+        return sendError(res, 400); // malformed percent-encoding
+    }
+    if (urlPath === '/') urlPath = '/index.html';
+
+    // Confine resolved path within the project dir — block path traversal (e.g. /../).
+    const filePath = path.normalize(path.join(__dirname, urlPath));
+    if (filePath !== __dirname && !filePath.startsWith(__dirname + path.sep)) {
+        return sendError(res, 403);
+    }
+
+    const ext = path.extname(filePath);
     fs.readFile(filePath, (err, data) => {
-        if (err) { res.writeHead(404); res.end('Not found'); return; }
+        if (err) {
+            return sendError(res, (err.code === 'ENOENT' || err.code === 'EISDIR') ? 404 : 500);
+        }
         res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
         res.end(data);
     });
